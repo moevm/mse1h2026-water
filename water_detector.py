@@ -1,4 +1,5 @@
 import requests
+import time
 
 def get_water_type_from_open_data(lat: float, lon: float, radius: int = 50) -> dict:
     """
@@ -35,28 +36,40 @@ def get_water_type_from_open_data(lat: float, lon: float, radius: int = 50) -> d
         'User-Agent': 'Water/1.0 (Project)'
     }
     
-    current_url = servers[0] 
-    response = requests.get(current_url, params={'data': query}, headers=headers, timeout=15)
-    response.raise_for_status()
-    
-    data = response.json()
-    if not data.get('elements'):
-        return result
+    for attempt in range(3):
+        current_url = servers[attempt % len(servers)] 
         
-    tags = data['elements'][0].get('tags', {})
-    result["raw_tags"] = tags
-    
-    if tags.get('natural') == 'wetland':
-        result["water_type"] = "болото"
-    elif 'waterway' in tags or tags.get('water') in ['river', 'stream', 'canal']:
-        result["water_type"] = "река"
-    elif tags.get('water') == 'pond':
-        result["water_type"] = "пруд"
-    elif tags.get('water') == 'lake' or tags.get('natural') == 'water':
-        result["water_type"] = "озеро"
-        
-    result["water_name"] = tags.get('name', tags.get('name:ru', 'Без названия'))
-    
+        try:
+            response = requests.get(current_url, params={'data': query}, headers=headers, timeout=15)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if not data.get('elements'):
+                return result
+                
+            tags = data['elements'][0].get('tags', {})
+            result["raw_tags"] = tags
+            
+            if tags.get('natural') == 'wetland':
+                result["water_type"] = "болото"
+            elif 'waterway' in tags or tags.get('water') in ['river', 'stream', 'canal']:
+                result["water_type"] = "река"
+            elif tags.get('water') == 'pond':
+                result["water_type"] = "пруд"
+            elif tags.get('water') == 'lake' or tags.get('natural') == 'water':
+                result["water_type"] = "озеро"
+                
+            result["water_name"] = tags.get('name', tags.get('name:ru', 'Без названия'))
+            
+            return result
+            
+        except (requests.exceptions.RequestException, ValueError) as e:
+            if attempt == 2:
+                result["error"] = f"Ошибка после 3 попыток: {str(e)}"
+            else:
+                time.sleep(2)
+
     return result
 
 if __name__ == "__main__":
