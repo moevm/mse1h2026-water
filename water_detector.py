@@ -46,6 +46,17 @@ def get_water_type_from_open_data(lat: float, lon: float, radius: int = 50) -> d
     tags = data['elements'][0].get('tags', {})
     result["raw_tags"] = tags
     
+    if tags.get('natural') == 'wetland':
+        result["water_type"] = "болото"
+    elif 'waterway' in tags or tags.get('water') in ['river', 'stream', 'canal']:
+        result["water_type"] = "река"
+    elif tags.get('water') == 'pond':
+        result["water_type"] = "пруд"
+    elif tags.get('water') == 'lake' or tags.get('natural') == 'water':
+        result["water_type"] = "озеро"
+        
+    result["water_name"] = tags.get('name', tags.get('name:ru', 'Без названия'))
+    
     return result
 
 if __name__ == "__main__":
