@@ -78,7 +78,7 @@ def get_water_type_from_open_data(lat: float, lon: float, radius: int = 50) -> d
     return result
 
 if __name__ == "__main__":
-    test_lat, test_lon = 59.943287526496405, 30.31233184690002 # Координаты в СПб (река Нева)
+    test_lat, test_lon = 59.965872971523886, 30.277092720124525 # Координаты в СПб (река Малая Невка)
     info = get_water_type_from_open_data(test_lat, test_lon, radius=50)
     
     if "error" in info:
