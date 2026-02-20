@@ -13,7 +13,12 @@ def get_water_type_from_open_data(lat: float, lon: float, radius: int = 50) -> d
     
     query = f"""
     [out:json];
+    is_in({lat},{lon})->.a;
     (
+      area.a["natural"="water"];
+      area.a["waterway"];
+      area.a["natural"="wetland"];
+      
       way["natural"="water"](around:{radius},{lat},{lon});
       relation["natural"="water"](around:{radius},{lat},{lon});
       way["waterway"](around:{radius},{lat},{lon});
