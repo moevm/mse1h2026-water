@@ -67,4 +67,4 @@ def get_satellite_image(lon, lat, buffer_km=5, start_date='2023-06-01', end_date
 
 if __name__ == "__main__":
     lon, lat = 30.3141, 59.9386
-    image, region = get_satellite_image(lon, lat, buffer_km=10)
+    image, region, url = get_satellite_image(lon, lat, buffer_km=10)
