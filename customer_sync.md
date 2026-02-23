@@ -18,6 +18,6 @@
   - Хальзев Александр Иванович
   - Виноградова Маргарита Олеговна
 - **Запись встречи**: [url](https://drive.google.com/file/d/19wBfYQtVUVfEsgf5tA2-6dCYhtdQGPBs/view?usp=sharing)
-
+- **Согласованный протокол**: [url](https://drive.google.com/file/d/1cRBGHFe9JxvKlf8LdEK3P6ZMsBS-GkA3/view?usp=sharing)
 
 
