@@ -25,7 +25,7 @@
 Ссылка на презентацию
 ### Запланированные задачи
 1. получить доступ в репозиторий и общим чатам
-2. правильно указать имена на guthub
+2. правильно указать имена на github
 3. провести встречи с командой и заказчиком
 4. создать шаблон для демо страницы
 5. создать один endpoint для запроса
@@ -33,10 +33,13 @@
 7. создать пример использования открытых данных (GEE API, OSM API)
 
 ### Выполненные задачи
-1. создан шаблон для демо страницы [wiki](https://github.com/moevm/mse1h2026-water/wiki/UI-demo-wiki)
-2. создан один endpoint для запроса [wiki](https://github.com/moevm/mse1h2026-water/wiki/Endpoint-для-запроса)
-3. пример использования готовой модели 
-4. пример использования открытых данных ([GEE API](https://github.com/moevm/mse1h2026-water/wiki/Использование-GEE-API), [OSM API](https://github.com/moevm/mse1h2026-water/wiki/Open-Data-Integration))
+1. получен доступ в репозиторий и общим чатам
+2. указаны имена на github
+3. проведена встреча с командой и заказчиком
+4. создан шаблон для демо страницы [wiki](https://github.com/moevm/mse1h2026-water/wiki/UI-demo-wiki)
+5. создан один endpoint для запроса [wiki](https://github.com/moevm/mse1h2026-water/wiki/Endpoint-для-запроса)
+6. пример использования готовой модели [wiki](https://github.com/moevm/mse1h2026-water/wiki/Классификатор-типов-водоемов-с-помощью-CV)
+7. пример использования открытых данных ([GEE API](https://github.com/moevm/mse1h2026-water/wiki/Использование-GEE-API), [OSM API](https://github.com/moevm/mse1h2026-water/wiki/Open-Data-Integration))
 
 ### Задачи на следующую итерацию
 1. связать компоненты
