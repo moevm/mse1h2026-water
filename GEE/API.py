@@ -22,9 +22,9 @@ def get_satellite_image(lon, lat, buffer_km=5, start_date='2023-06-01', end_date
 
     if image.getInfo() is None:
         print("Нет изображений за указанный период")
-        return None, None
+        return None, None, None
 
-    rgb_image = image.select(['B4', 'B3', 'B2'])
+    rgb_image = image.select(['B4', 'B3', 'B2', 'B8'])
     
     url = rgb_image.getThumbURL({
         'region': region,
@@ -54,7 +54,7 @@ def get_satellite_image(lon, lat, buffer_km=5, start_date='2023-06-01', end_date
             "end": end_date
         },
         "thumbnail_url": url,
-        "bands_used": ["B4", "B3", "B2"],
+        "bands_used": ["B4", "B3", "B2", "B8"],
         "created_at": datetime.now().isoformat()
     }
 
@@ -63,7 +63,7 @@ def get_satellite_image(lon, lat, buffer_km=5, start_date='2023-06-01', end_date
         
     print(f"URL изображения: {url}")
 
-    return rgb_image, region
+    return rgb_image, region, url
 
 if __name__ == "__main__":
     lon, lat = 30.3141, 59.9386
