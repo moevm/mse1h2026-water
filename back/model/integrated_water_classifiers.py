@@ -1,4 +1,4 @@
-from GEE.API import get_satellite_image
+from back.model.API import get_satellite_image
 import numpy as np
 import cv2
 import requests
@@ -9,7 +9,7 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
     """
     Классификация водоемов через OpenCV
     Работает:
-      - с image_data + region (GEE Image)
+      - с image_data + region (model Image)
       - с image_source (локальный файл или URL)
     """
 
@@ -42,7 +42,7 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
         arr = np.frombuffer(resp.content, np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if img is None:
-            raise ValueError("Не удалось загрузить изображение из GEE")
+            raise ValueError("Не удалось загрузить изображение из model")
 
     else:
         raise ValueError("Не указаны ни image_source, ни image_data + region")
