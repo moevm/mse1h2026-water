@@ -33,7 +33,7 @@ def get_satellite_image(
         print("Нет изображений за указанный период")
         return None, None, None
 
-    rgb_image = image.select(['B4', 'B3', 'B2'])
+    rgb_image = image.select(['B4', 'B3', 'B2', 'B8'])
     
     url = rgb_image.getThumbURL({
         'region': region,
@@ -63,7 +63,7 @@ def get_satellite_image(
             "end": end_date
         },
         "thumbnail_url": url,
-        "bands_used": ["B4", "B3", "B2"],
+        "bands_used": ["B4", "B3", "B2", "B8"],
         "created_at": datetime.now().isoformat()
     }
 
