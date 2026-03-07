@@ -33,7 +33,7 @@ def get_satellite_image(
         print("Нет изображений за указанный период")
         return None, None, None
 
-    rgb_image = image.select(['B4', 'B3', 'B2', 'B8'])
+    rgb_image = image.select(['B4', 'B3', 'B2'])
     
     url = rgb_image.getThumbURL({
         'region': region,
