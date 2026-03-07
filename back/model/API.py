@@ -1,5 +1,6 @@
 import ee
 import json
+import webbrowser
 from datetime import datetime
 from typing import Tuple, Optional
 
@@ -69,7 +70,7 @@ def get_satellite_image(
     with open(json_filename, 'w', encoding='utf-8') as f:
         json.dump(image_metadata, f, ensure_ascii=False, indent=4)
         
-    print(f"URL изображения: {url}")
+    webbrowser.open(url)
 
     return rgb_image, region, url
 
