@@ -37,6 +37,13 @@ class Coords:
     lon: float
 
 
+MAP_STYLE_OPTIONS = {
+    "Спутник": "satellite",
+    "Спутник + улицы": "satellite-streets",
+    "Схема": "streets",
+}
+
+
 def parse_float(text: str) -> Optional[float]:
     if text is None or not FLOAT_RE.match(text):
         return None
@@ -74,6 +81,7 @@ def reset_coords() -> None:
     st.session_state["map_lat"] = 59.9343
     st.session_state["map_lon"] = 30.3351
     st.session_state["map_zoom"] = 10
+    st.session_state["map_style_label"] = "Спутник"
 
 
 def try_precheck_running() -> None:
@@ -109,7 +117,7 @@ def run_analysis(coords: Coords) -> str:
     )
 
 
-def build_map_figure(lat: float, lon: float, zoom: int) -> go.Figure:
+def build_map_figure(lat: float, lon: float, zoom: int, map_style: str) -> go.Figure:
     fig = go.Figure(
         go.Scattermap(
             lat=[lat],
@@ -123,7 +131,7 @@ def build_map_figure(lat: float, lon: float, zoom: int) -> go.Figure:
 
     fig.update_layout(
         map={
-            "style": "open-street-map",
+            "style": map_style,
             "center": {"lat": lat, "lon": lon},
             "zoom": zoom,
         },
@@ -153,6 +161,8 @@ if "map_lon" not in st.session_state:
     st.session_state["map_lon"] = 30.3351
 if "map_zoom" not in st.session_state:
     st.session_state["map_zoom"] = 10
+if "map_style_label" not in st.session_state:
+    st.session_state["map_style_label"] = "Спутник"
 
 
 st.title("🧭 Анализ по координатам")
@@ -183,14 +193,14 @@ b1, b2 = st.columns([1, 1])
 with b1:
     st.button(
         "🔎 Проанализировать",
-        use_container_width=True,
+        width="stretch",
         on_click=try_precheck_running,
     )
 
 with b2:
     st.button(
         "↩️ Сбросить координаты",
-        use_container_width=True,
+        width="stretch",
         on_click=reset_coords,
     )
 
@@ -201,15 +211,24 @@ if st.session_state["result_text"]:
 st.markdown("---")
 st.subheader("🗺️ Карта")
 
+st.selectbox(
+    "Тип отображения карты",
+    options=list(MAP_STYLE_OPTIONS.keys()),
+    key="map_style_label",
+)
+
+selected_map_style = MAP_STYLE_OPTIONS[st.session_state["map_style_label"]]
+
 fig = build_map_figure(
     lat=st.session_state["map_lat"],
     lon=st.session_state["map_lon"],
     zoom=st.session_state["map_zoom"],
+    map_style=selected_map_style,
 )
 
 st.plotly_chart(
     fig,
-    use_container_width=True,
+    width="stretch",
     config={
         "scrollZoom": True,
         "displayModeBar": False,

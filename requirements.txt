@@ -32,6 +32,7 @@ opencv-python==4.13.0.92
 packaging==26.0
 pandas==2.3.3
 pillow==12.1.1
+plotly==6.6.0
 proto-plus==1.27.1
 protobuf==6.33.5
 pyarrow==23.0.1
