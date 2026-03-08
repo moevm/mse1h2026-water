@@ -47,16 +47,6 @@ def parse_float(text: str) -> Optional[float]:
         return None
 
 
-def validate_coords(lat: Optional[float], lon: Optional[float]) -> Tuple[bool, str]:
-    if lat is None or lon is None:
-        return False, "Введите оба числа в формате 60.123456"
-    if not (-90 <= lat <= 90):
-        return False, "Широта должна быть от -90 до 90"
-    if not (-180 <= lon <= 180):
-        return False, "Долгота должна быть от -180 до 180"
-    return True, ""
-
-
 def reset_coords():
     st.session_state["lat_text"] = ""
     st.session_state["lon_text"] = ""
@@ -69,13 +59,13 @@ def try_precheck_running():
     st.session_state.submitted = True
     lat_val = parse_float(st.session_state.lat_text)
     lon_val = parse_float(st.session_state.lon_text)
-    ok, err = validate_coords(lat_val, lon_val)
-    if ok:
-        st.session_state.result_text = run_analysis(Coords(lat=lat_val, lon=lon_val))
-        st.session_state.error_text = ""
-    else:
-        st.session_state.result_text = ""
-        st.session_state.error_text = err
+    # ok, err = validate_coords(lat_val, lon_val)
+    # if ok:
+    #     st.session_state.result_text = run_analysis(Coords(lat=lat_val, lon=lon_val))
+    #     st.session_state.error_text = ""
+    # else:
+    #     st.session_state.result_text = ""
+    #     st.session_state.error_text = err
 
 def run_analysis(coords: Coords) -> str:
     return (
@@ -114,9 +104,6 @@ with b1:
     analyze_clicked = st.button("🔎 Проанализировать", use_container_width=True, on_click=try_precheck_running)
 with b2:
     reset_clicked = st.button("↩️ Сбросить координаты", use_container_width=True, on_click=reset_coords)
-
-if st.session_state.error_text:
-    st.warning(st.session_state.error_text)
 
 if st.session_state.result_text:
     st.success("Анализ выполнен!")
