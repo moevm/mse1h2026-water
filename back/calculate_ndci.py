@@ -3,9 +3,6 @@ import json
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-ee.Authenticate()
-ee.Initialize(project='mseml-488016')
-
 def get_eutrophication_stats(
     lon: float, 
     lat: float, 
@@ -13,7 +10,7 @@ def get_eutrophication_stats(
     start_date: str = '2023-07-01', 
     end_date: str = '2023-08-31',
     ndci_threshold: float = 0.1,
-    json_filename: str = 'eutrophication_stats.json'
+    json_filename: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     
     point = ee.Geometry.Point([lon, lat])
@@ -55,15 +52,6 @@ def get_eutrophication_stats(
     
     polluted_percentage = (polluted_water_sqm/total_water_sqm)*100
 
-    if polluted_percentage > 50:
-        status = "Критическая эвтрофикация"
-    elif polluted_percentage > 20:
-        status = "Умеренная эвтрофикация"
-    elif polluted_percentage > 5:
-        status = "Начальная стадия цветения"
-    else:
-        status = "Чистый водоем"
-
     ndci_mean_stats = ndci.updateMask(water_mask).reduceRegion(
         reducer=ee.Reducer.mean(),
         geometry=region,
@@ -79,21 +67,34 @@ def get_eutrophication_stats(
         "total_water_area_m2": round(total_water_sqm, 2),
         "polluted_area_m2": round(polluted_water_sqm, 2),
         "polluted_percentage": round(polluted_percentage, 2),
-        "status": status,
         "date_analyzed": image.get('DATATAKE_IDENTIFIER').getInfo(),
         "calculated_at": datetime.now().isoformat()
     }
 
-    with open(json_filename, 'w', encoding='utf-8') as f:
-        json.dump(result_data, f, ensure_ascii=False, indent=4)
+    if json_filename:
+        with open(json_filename, 'w', encoding='utf-8') as f:
+            json.dump(result_data, f, ensure_ascii=False, indent=4)
 
     return result_data
 
 if __name__ == "__main__":
-    result = get_eutrophication_stats(lon=30.467771706602502, lat=59.92258378589277, buffer_km=0.5)
+    ee.Authenticate()
+    ee.Initialize(project='mseml-488016')
+
+    lon, lat = 30.4677, 59.9226
+    buffer_km = 0.5
+    start_date = '2023-07-01'
+    end_date = '2023-08-31'
+    ndci_threshold = 0.1
+
+    result = get_eutrophication_stats(
+        lon=lon, lat=lat, buffer_km=buffer_km, 
+        start_date=start_date, end_date=end_date, 
+        ndci_threshold=ndci_threshold,
+        json_filename='eutrophication_stats.json'
+    )
 
     if result:
         print(f"Средний индекс хлорофилла (NDCI): {result['ndci_mean']}")
-        print(f"Доля эвтрофикации (цветения): {result['polluted_percentage']}%")
-        print(f"Экологический статус: {result['status']}")
+        print(f"Доля эвтрофикации: {result['polluted_percentage']}%")
         print(f"Общая площадь воды: {result['total_water_area_m2']} кв.м.")
