@@ -32,7 +32,18 @@ def get_eutrophication_stats(
     ndci = image.normalizedDifference(['B5', 'B4'])
     polluted_mask = ndci.gt(ndci_threshold).And(water_mask)
 
-    return {"status": "Pollution mask created"}
+    pixel_area = ee.Image.pixelArea()
+    water_area_img = water_mask.multiply(pixel_area)
+    polluted_area_img = polluted_mask.multiply(pixel_area)
+
+    stats = water_area_img.addBands(polluted_area_img).reduceRegion(
+        reducer=ee.Reducer.sum(),
+        geometry=region,
+        scale=10, 
+        maxPixels=1e9
+    ).getInfo()
+
+    return {"total_water": stats.get('nd'), "polluted_water": stats.get('nd_1')}
 
 if __name__ == "__main__":
     print(get_eutrophication_stats(lon=30.3141, lat=59.9386))
