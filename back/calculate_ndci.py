@@ -24,7 +24,11 @@ def get_eutrophication_stats(
         return None
 
     image = collection.first()
-    return {"status": "Image found"}
+
+    ndwi = image.normalizedDifference(['B3', 'B8'])
+    water_mask = ndwi.gt(0)
+
+    return {"status": "Water mask created"}
 
 if __name__ == "__main__":
     print(get_eutrophication_stats(lon=30.3141, lat=59.9386))
