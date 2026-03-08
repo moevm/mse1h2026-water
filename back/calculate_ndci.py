@@ -9,7 +9,8 @@ def get_eutrophication_stats(
     lat: float, 
     buffer_km: float = 5.0, 
     start_date: str = '2023-07-01', 
-    end_date: str = '2023-08-31'
+    end_date: str = '2023-08-31',
+    ndci_threshold: float = 0.1
 ) -> Optional[Dict[str, Any]]:
     
     point = ee.Geometry.Point([lon, lat])
@@ -28,7 +29,10 @@ def get_eutrophication_stats(
     ndwi = image.normalizedDifference(['B3', 'B8'])
     water_mask = ndwi.gt(0)
 
-    return {"status": "Water mask created"}
+    ndci = image.normalizedDifference(['B5', 'B4'])
+    polluted_mask = ndci.gt(ndci_threshold).And(water_mask)
+
+    return {"status": "Pollution mask created"}
 
 if __name__ == "__main__":
     print(get_eutrophication_stats(lon=30.3141, lat=59.9386))
