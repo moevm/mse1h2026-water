@@ -1,3 +1,8 @@
+# How to build
+# docker build -f front/Dockerfile -t water-frontend .
+# How to up
+# docker run -p 8501:8501 water-frontend
+
 FROM python:3.12-slim
 
 WORKDIR /app
