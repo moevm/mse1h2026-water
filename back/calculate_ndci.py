@@ -1,4 +1,6 @@
 import ee
+import json
+from datetime import datetime
 from typing import Optional, Dict, Any
 
 ee.Authenticate()
@@ -10,7 +12,8 @@ def get_eutrophication_stats(
     buffer_km: float = 5.0, 
     start_date: str = '2023-07-01', 
     end_date: str = '2023-08-31',
-    ndci_threshold: float = 0.1
+    ndci_threshold: float = 0.1,
+    json_filename: str = 'eutrophication_stats.json'
 ) -> Optional[Dict[str, Any]]:
     
     point = ee.Geometry.Point([lon, lat])
@@ -43,7 +46,54 @@ def get_eutrophication_stats(
         maxPixels=1e9
     ).getInfo()
 
-    return {"total_water": stats.get('nd'), "polluted_water": stats.get('nd_1')}
+    total_water_sqm = stats.get('nd')
+    polluted_water_sqm = stats.get('nd_1')
+
+    if not total_water_sqm or total_water_sqm == 0:
+        print("В заданном радиусе не найдено водоемов.")
+        return None
+    
+    polluted_percentage = (polluted_water_sqm/total_water_sqm)*100
+
+    if polluted_percentage > 50:
+        status = "Критическая эвтрофикация"
+    elif polluted_percentage > 20:
+        status = "Умеренная эвтрофикация"
+    elif polluted_percentage > 5:
+        status = "Начальная стадия цветения"
+    else:
+        status = "Чистый водоем"
+
+    ndci_mean_stats = ndci.updateMask(water_mask).reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=region,
+        scale=10, 
+        maxPixels=1e9
+    ).getInfo()
+    
+    ndci_mean_value = ndci_mean_stats.get('nd')
+
+    result_data = {
+        "coordinates": {"lon": lon, "lat": lat},
+        "ndci_mean": round(ndci_mean_value, 4) if ndci_mean_value else None,
+        "total_water_area_m2": round(total_water_sqm, 2),
+        "polluted_area_m2": round(polluted_water_sqm, 2),
+        "polluted_percentage": round(polluted_percentage, 2),
+        "status": status,
+        "date_analyzed": image.get('DATATAKE_IDENTIFIER').getInfo(),
+        "calculated_at": datetime.now().isoformat()
+    }
+
+    with open(json_filename, 'w', encoding='utf-8') as f:
+        json.dump(result_data, f, ensure_ascii=False, indent=4)
+
+    return result_data
 
 if __name__ == "__main__":
-    print(get_eutrophication_stats(lon=30.3141, lat=59.9386))
+    result = get_eutrophication_stats(lon=30.467771706602502, lat=59.92258378589277, buffer_km=0.5)
+
+    if result:
+        print(f"Средний индекс хлорофилла (NDCI): {result['ndci_mean']}")
+        print(f"Доля эвтрофикации (цветения): {result['polluted_percentage']}%")
+        print(f"Экологический статус: {result['status']}")
+        print(f"Общая площадь воды: {result['total_water_area_m2']} кв.м.")
