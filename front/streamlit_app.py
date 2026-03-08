@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 
 
 st.set_page_config(
@@ -71,6 +73,9 @@ def reset_coords() -> None:
     st.session_state["submitted"] = False
     st.session_state["lat_error"] = ""
     st.session_state["lon_error"] = ""
+    st.session_state["map_lat"] = 59.9343
+    st.session_state["map_lon"] = 30.3351
+    st.session_state["map_zoom"] = 10
 
 
 def try_precheck_running() -> None:
@@ -113,6 +118,15 @@ if "lat_error" not in st.session_state:
 if "lon_error" not in st.session_state:
     st.session_state.lon_error = ""
 
+#map
+if "map_lat" not in st.session_state:
+    st.session_state.map_lat = 59.9343
+
+if "map_lon" not in st.session_state:
+    st.session_state.map_lon = 30.3351
+
+if "map_zoom" not in st.session_state:
+    st.session_state.map_zoom = 10
 
 st.title("🧭 Анализ по координатам")
 st.write("Введите широту и долготу и нажмите кнопку ниже.")
@@ -148,3 +162,55 @@ with b2:
 if st.session_state.result_text:
     st.success("Анализ выполнен!")
     st.markdown(st.session_state.result_text)
+
+def build_map(lat: float, lon: float, zoom: int) -> folium.Map:
+    m = folium.Map(
+        location=[lat, lon],
+        zoom_start=zoom,
+        tiles=None,
+        control_scale=True,
+    )
+
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="",
+        name="Спутник",
+        overlay=False,
+        control=False,
+    ).add_to(m)
+
+    folium.Marker(
+        [lat, lon],
+        tooltip="Выбранная точка",
+    ).add_to(m)
+
+    return m
+
+st.markdown("---")
+st.subheader("🗺️ Выберите точку на карте")
+
+map_object = build_map(
+    lat=st.session_state.map_lat,
+    lon=st.session_state.map_lon,
+    zoom=st.session_state.map_zoom,
+)
+
+map_data = st_folium(
+    map_object,
+    width=None,
+    height=500,
+    returned_objects=["last_clicked"],
+    key="coords_map",
+)
+
+if map_data and map_data.get("last_clicked"):
+    clicked_lat = map_data["last_clicked"]["lat"]
+    clicked_lon = map_data["last_clicked"]["lng"]
+
+    st.session_state.lat_text = f"{clicked_lat:.6f}"
+    st.session_state.lon_text = f"{clicked_lon:.6f}"
+    st.session_state.map_lat = clicked_lat
+    st.session_state.map_lon = clicked_lon
+    st.session_state.lat_error = ""
+    st.session_state.lon_error = ""
+    st.rerun()
