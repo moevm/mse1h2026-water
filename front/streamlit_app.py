@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
+import plotly.graph_objects as go
 import streamlit as st
 
 
@@ -20,15 +21,13 @@ st.markdown(
 [data-testid="stAppDeployButton"],
 button[aria-label="Deploy"],
 button[title="Deploy"] {
-  display: none !important;
+    display: none !important;
 }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-
-# Validation regular expression
 FLOAT_RE = re.compile(r"^\s*[-+]?\d+(?:\.\d+)?\s*$")
 
 
@@ -36,6 +35,13 @@ FLOAT_RE = re.compile(r"^\s*[-+]?\d+(?:\.\d+)?\s*$")
 class Coords:
     lat: float
     lon: float
+
+
+MAP_STYLE_OPTIONS = {
+    "Спутник": "satellite",
+    "Спутник + улицы": "satellite-streets",
+    "Схема": "streets",
+}
 
 
 def parse_float(text: str) -> Optional[float]:
@@ -47,35 +53,61 @@ def parse_float(text: str) -> Optional[float]:
         return None
 
 
-def validate_coords(lat: Optional[float], lon: Optional[float]) -> Tuple[bool, str]:
-    if lat is None or lon is None:
-        return False, "Введите оба числа в формате 60.123456"
-    if not (-90 <= lat <= 90):
-        return False, "Широта должна быть от -90 до 90"
-    if not (-180 <= lon <= 180):
-        return False, "Долгота должна быть от -180 до 180"
-    return True, ""
+def validate_lat(text: str) -> str:
+    value = parse_float(text)
+    if value is None:
+        return "Введите широту числом в формате 60.123456"
+    if not (-90 <= value <= 90):
+        return "Широта должна быть от -90 до 90"
+    return ""
 
 
-def reset_coords():
+def validate_lon(text: str) -> str:
+    value = parse_float(text)
+    if value is None:
+        return "Введите долготу числом в формате 30.123456"
+    if not (-180 <= value <= 180):
+        return "Долгота должна быть от -180 до 180"
+    return ""
+
+
+def reset_coords() -> None:
     st.session_state["lat_text"] = ""
     st.session_state["lon_text"] = ""
     st.session_state["result_text"] = ""
     st.session_state["submitted"] = False
-    st.session_state["error_text"] = ""
+    st.session_state["lat_error"] = ""
+    st.session_state["lon_error"] = ""
+    st.session_state["map_lat"] = 59.9343
+    st.session_state["map_lon"] = 30.3351
+    st.session_state["map_zoom"] = 10
+    st.session_state["map_style_label"] = "Спутник"
 
 
-def try_precheck_running():
-    st.session_state.submitted = True
-    lat_val = parse_float(st.session_state.lat_text)
-    lon_val = parse_float(st.session_state.lon_text)
-    ok, err = validate_coords(lat_val, lon_val)
-    if ok:
-        st.session_state.result_text = run_analysis(Coords(lat=lat_val, lon=lon_val))
-        st.session_state.error_text = ""
-    else:
-        st.session_state.result_text = ""
-        st.session_state.error_text = err
+def try_precheck_running() -> None:
+    st.session_state["submitted"] = True
+
+    lat_error = validate_lat(st.session_state["lat_text"])
+    lon_error = validate_lon(st.session_state["lon_text"])
+
+    st.session_state["lat_error"] = lat_error
+    st.session_state["lon_error"] = lon_error
+
+    if lat_error or lon_error:
+        st.session_state["result_text"] = ""
+        return
+
+    lat_val = parse_float(st.session_state["lat_text"])
+    lon_val = parse_float(st.session_state["lon_text"])
+
+    if lat_val is None or lon_val is None:
+        st.session_state["result_text"] = ""
+        return
+
+    st.session_state["map_lat"] = lat_val
+    st.session_state["map_lon"] = lon_val
+    st.session_state["result_text"] = run_analysis(Coords(lat=lat_val, lon=lon_val))
+
 
 def run_analysis(coords: Coords) -> str:
     return (
@@ -84,40 +116,121 @@ def run_analysis(coords: Coords) -> str:
         f"📍 Координаты: {coords.lat:.6f}, {coords.lon:.6f}"
     )
 
-# --- session state defaults ---
-if "lat_text" not in st.session_state:
-    st.session_state.lat_text = ""
-if "lon_text" not in st.session_state:
-    st.session_state.lon_text = ""
-if "result_text" not in st.session_state:
-    st.session_state.result_text = ""
-if "submitted" not in st.session_state:
-    st.session_state.submitted = False
-if "error_text" not in st.session_state:
-    st.session_state.error_text = ""
 
-# UI
+def build_map_figure(lat: float, lon: float, zoom: int, map_style: str) -> go.Figure:
+    fig = go.Figure(
+        go.Scattermap(
+            lat=[lat],
+            lon=[lon],
+            mode="markers",
+            marker={"size": 16},
+            text=[f"Точка: {lat:.6f}, {lon:.6f}"],
+            hoverinfo="text",
+        )
+    )
+
+    fig.update_layout(
+        map={
+            "style": map_style,
+            "center": {"lat": lat, "lon": lon},
+            "zoom": zoom,
+        },
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        height=500,
+        showlegend=False,
+    )
+
+    return fig
+
+
+if "lat_text" not in st.session_state:
+    st.session_state["lat_text"] = ""
+if "lon_text" not in st.session_state:
+    st.session_state["lon_text"] = ""
+if "result_text" not in st.session_state:
+    st.session_state["result_text"] = ""
+if "submitted" not in st.session_state:
+    st.session_state["submitted"] = False
+if "lat_error" not in st.session_state:
+    st.session_state["lat_error"] = ""
+if "lon_error" not in st.session_state:
+    st.session_state["lon_error"] = ""
+if "map_lat" not in st.session_state:
+    st.session_state["map_lat"] = 59.9343
+if "map_lon" not in st.session_state:
+    st.session_state["map_lon"] = 30.3351
+if "map_zoom" not in st.session_state:
+    st.session_state["map_zoom"] = 10
+if "map_style_label" not in st.session_state:
+    st.session_state["map_style_label"] = "Спутник"
+
+
 st.title("🧭 Анализ по координатам")
-st.write("Введите широту и долготу и нажмите кнопку ниже.")
+st.write("Введите широту и долготу вручную. Карта ниже обновится по выбранной точке.")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.text_input("Широта", key="lat_text", placeholder="например: 60.123456")
+    st.text_input(
+        "Широта",
+        key="lat_text",
+        placeholder="например: 60.123456",
+    )
+    if st.session_state["lat_error"]:
+        st.error(st.session_state["lat_error"])
 
 with col2:
-    st.text_input("Долгота", key="lon_text", placeholder="например: 30.123456")
+    st.text_input(
+        "Долгота",
+        key="lon_text",
+        placeholder="например: 30.123456",
+    )
+    if st.session_state["lon_error"]:
+        st.error(st.session_state["lon_error"])
 
-# кнопки
 b1, b2 = st.columns([1, 1])
+
 with b1:
-    analyze_clicked = st.button("🔎 Проанализировать", use_container_width=True, on_click=try_precheck_running)
+    st.button(
+        "🔎 Проанализировать",
+        width="stretch",
+        on_click=try_precheck_running,
+    )
+
 with b2:
-    reset_clicked = st.button("↩️ Сбросить координаты", use_container_width=True, on_click=reset_coords)
+    st.button(
+        "↩️ Сбросить координаты",
+        width="stretch",
+        on_click=reset_coords,
+    )
 
-if st.session_state.error_text:
-    st.warning(st.session_state.error_text)
-
-if st.session_state.result_text:
+if st.session_state["result_text"]:
     st.success("Анализ выполнен!")
-    st.markdown(st.session_state.result_text)
+    st.markdown(st.session_state["result_text"])
+
+st.markdown("---")
+st.subheader("🗺️ Карта")
+
+st.selectbox(
+    "Тип отображения карты",
+    options=list(MAP_STYLE_OPTIONS.keys()),
+    key="map_style_label",
+)
+
+selected_map_style = MAP_STYLE_OPTIONS[st.session_state["map_style_label"]]
+
+fig = build_map_figure(
+    lat=st.session_state["map_lat"],
+    lon=st.session_state["map_lon"],
+    zoom=st.session_state["map_zoom"],
+    map_style=selected_map_style,
+)
+
+st.plotly_chart(
+    fig,
+    width="stretch",
+    config={
+        "scrollZoom": True,
+        "displayModeBar": False,
+    },
+)
