@@ -1,11 +1,18 @@
 import ee
 import json
+import webbrowser
 from datetime import datetime
+from typing import Tuple, Optional, Dict, Any
 
-ee.Authenticate()
-ee.Initialize(project='mseml-488016')
-
-def get_satellite_image(lon, lat, buffer_km=5, start_date='2023-06-01', end_date='2023-08-31', json_filename='image_info.json'):
+def get_satellite_image(
+        lon: float,                 
+        lat: float, 
+        buffer_km: float = 5.0, 
+        start_date: str = '2023-06-01',
+        end_date: str = '2023-08-31',
+        json_filename: Optional[str] = None,
+        open_browser: bool = False
+) -> Tuple[Optional[ee.Image], Optional[ee.Geometry], Optional[str], Optional[Dict[str, Any]]]:
     """
     Получение спутникового снимка
     """
@@ -22,7 +29,7 @@ def get_satellite_image(lon, lat, buffer_km=5, start_date='2023-06-01', end_date
 
     if image.getInfo() is None:
         print("Нет изображений за указанный период")
-        return None, None, None
+        return None, None, None, None
 
     rgb_image = image.select(['B4', 'B3', 'B2', 'B8'])
     
@@ -58,13 +65,26 @@ def get_satellite_image(lon, lat, buffer_km=5, start_date='2023-06-01', end_date
         "created_at": datetime.now().isoformat()
     }
 
-    with open(json_filename, 'w', encoding='utf-8') as f:
-        json.dump(image_metadata, f, ensure_ascii=False, indent=4)
-        
-    print(f"URL изображения: {url}")
+    if json_filename:
+        with open(json_filename, 'w', encoding='utf-8') as f:
+            json.dump(image_metadata, f, ensure_ascii=False, indent=4)
+    
+    if open_browser:
+        webbrowser.open(url)
 
-    return rgb_image, region, url
+    return rgb_image, region, url, image_metadata
 
 if __name__ == "__main__":
+    ee.Authenticate()
+    ee.Initialize(project='mseml-488016')
+
     lon, lat = 30.3141, 59.9386
-    image, region, url = get_satellite_image(lon, lat, buffer_km=10)
+    buffer_km = 10
+    start_date, end_date = '2023-06-01', '2023-08-31'
+    
+    image, region, url, metadata = get_satellite_image(
+        lon=lon, lat=lat, buffer_km=buffer_km, 
+        start_date=start_date, end_date=end_date,
+        json_filename='image_info.json',
+        open_browser=True
+    )
