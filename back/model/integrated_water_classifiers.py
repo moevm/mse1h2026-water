@@ -53,18 +53,35 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
     # Настоящие каналы для NDWI (B3 - B8)
     # =========================
     if image_data is not None:
+        # NDWI
         ndwi_img = image_data.normalizedDifference(['B3', 'B8'])
-        thumb_url = ndwi_img.getThumbURL({
+        ndwi_thumb_url = ndwi_img.getThumbURL({
             'region': region,
             'dimensions': 1024,
             'format': 'png',
             'min': -1,
             'max': 1
         })
-        resp = requests.get(thumb_url)
+        resp = requests.get(ndwi_thumb_url)
         arr = np.frombuffer(resp.content, np.uint8)
-        water_mask = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
-        water_mask = (water_mask > 127).astype(np.uint8) * 255  # бинаризация
+        ndwi_mask = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+        ndwi_mask = (ndwi_mask > 127).astype(np.uint8) * 255
+
+        # MNDWI
+        mndwi_img = image_data.normalizedDifference(['B3', 'B11'])
+        mndwi_thumb_url = mndwi_img.getThumbURL({
+            'region': region,
+            'dimensions': 1024,
+            'format': 'png',
+            'min': -1,
+            'max': 1
+        })
+        resp = requests.get(mndwi_thumb_url)
+        arr = np.frombuffer(resp.content, np.uint8)
+        mndwi_mask = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+        mndwi_mask = (mndwi_mask > 127).astype(np.uint8) * 255
+
+        water_mask = cv2.bitwise_and(ndwi_mask, mndwi_mask)
     else:
         # для обычного RGB (thumbnail / local file)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -151,7 +168,7 @@ if __name__ == "__main__":
 
     lon, lat = 30.3141, 59.9386  # Санкт-Петербург
 
-    image, region, url = get_satellite_image(lon, lat, buffer_km=10)
+    image, region, url, metadata = get_satellite_image(lon, lat, buffer_km=6)
 
     cv_results = cv_integrated_water_classifier(image, region, url)
     print(cv_results)
