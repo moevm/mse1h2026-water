@@ -39,7 +39,7 @@ def get_satellite_image(
         'format': 'png',
         'min': 0,
         'max': 3000,
-        'gamma': 1.4
+        # 'gamma': 1.4
     })
 
     info = image.getInfo()

@@ -1,11 +1,15 @@
-from back.model.API import get_satellite_image
+from model.download_images import get_satellite_image
+
+import asyncio
 import numpy as np
 import cv2
 import requests
 import os
+import base64
+import uuid
 
 
-def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, file_to_save="cv_water_objects.png"):
+async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, file_to_save=None, is_create_file_with_url=True):
     """
     Классификация водоемов через OpenCV
     Работает:
@@ -83,7 +87,7 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
     # Контуры и классификация
     # =========================
     contours, _ = cv2.findContours(water_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+    
     results = []
     obj_id = 1
     h_img, w_img = annotated.shape[:2]
@@ -95,13 +99,14 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
         "пруд": (0, 255, 255) # желтый
     }
 
+    loop = asyncio.get_running_loop()
     for cnt in contours:
         area = cv2.contourArea(cnt)
         if area < 10:
             continue
 
         # минимальный повёрнутый прямоугольник
-        rect = cv2.minAreaRect(cnt)  # ((cx, cy), (w, h), angle)
+        rect = await loop.run_in_executor(None, cv2.minAreaRect, cnt) # ((cx, cy), (w, h), angle)
         (cx_r, cy_r), (w, h), angle = rect
         elongation = max(w, h) / (min(w, h) + 1e-6)
 
@@ -120,17 +125,18 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
         cx = int(M["m10"] / M["m00"]) if M["m00"] != 0 else int(cx_r)
         cy = int(M["m01"] / M["m00"]) if M["m00"] != 0 else int(cy_r)
 
-        cv2.drawContours(annotated, [cnt], -1, color_dict[water_type], 2)
+        cv2.drawContours(annotated, [cnt], -1, color_dict[water_type], 1)
         cv2.putText(annotated, str(obj_id), (cx, cy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_dict[water_type], 2)
-
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_dict[water_type], 1)
+        
         result = {
             "id": obj_id,
             "area_pixels": area,
             "elongation": float(elongation),
             "type": water_type,
             "center_x": cx,
-            "center_y": cy
+            "center_y": cy,
+            "contours": [c.squeeze().tolist() for c in contours]
         }
 
         if region is not None:
@@ -144,8 +150,20 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
         results.append(result)
         obj_id += 1
 
-    cv2.imwrite(file_to_save, annotated)
-    return results
+    if file_to_save:
+        cv2.imwrite(file_to_save, annotated)
+        
+    if is_create_file_with_url:
+        unique_filename = f"{uuid.uuid4()}.png"
+        save_path = os.path.join("img/classified", unique_filename)
+        cv2.imwrite(save_path, annotated)
+        annotated_url = f"img/classified/{unique_filename}"
+    
+    return {
+        'annotated_url': annotated_url,
+        'results': results,
+    }
+
 
 if __name__ == "__main__":
 
@@ -153,5 +171,5 @@ if __name__ == "__main__":
 
     image, region, url = get_satellite_image(lon, lat, buffer_km=10)
 
-    cv_results = cv_integrated_water_classifier(image, region, url)
+    cv_results = cv_integrated_water_classifier(image, region, url, file_to_save="cv_water_objects.png")
     print(cv_results)
