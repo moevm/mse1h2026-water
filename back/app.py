@@ -4,6 +4,8 @@ from fastapi import FastAPI, APIRouter, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+import calculate_ndci
+
 import uvicorn
 import os
 
@@ -37,6 +39,7 @@ async def get_water_info(
     
     result = await methods.integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
     result["annotated_url"] = f"{request.base_url}{result["annotated_url"]}"
+    result["eutrophication_stats"] = calculate_ndci.get_eutrophication_stats(lon, lat, buffer_km, start_date, end_date)
     return result
 
 
