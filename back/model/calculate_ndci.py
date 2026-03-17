@@ -83,8 +83,8 @@ if __name__ == "__main__":
 
     lon, lat = 30.4677, 59.9226
     buffer_km = 0.5
-    start_date = '2023-07-01'
-    end_date = '2023-08-31'
+    start_date = '2025-07-15'
+    end_date = '2025-09-10'
     ndci_threshold = 0.1
 
     result = get_eutrophication_stats(
