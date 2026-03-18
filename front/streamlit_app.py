@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional
-
+from typing import Optional, Dict, Any
+import requests 
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -29,7 +29,8 @@ button[title="Deploy"] {
 )
 
 FLOAT_RE = re.compile(r"^\s*[-+]?\d+(?:\.\d+)?\s*$")
-
+BACKEND_URL = "http://localhost:8000" 
+WATER_INFO_ENDPOINT = f"{BACKEND_URL}/water-info"
 
 @dataclass(frozen=True)
 class Coords:
@@ -82,7 +83,7 @@ def reset_coords() -> None:
     st.session_state["map_lon"] = 30.3351
     st.session_state["map_zoom"] = 10
     st.session_state["map_style_label"] = "Спутник"
-
+    st.session_state["api_error"] = "" 
 
 def try_precheck_running() -> None:
     st.session_state["submitted"] = True
@@ -106,15 +107,60 @@ def try_precheck_running() -> None:
 
     st.session_state["map_lat"] = lat_val
     st.session_state["map_lon"] = lon_val
-    st.session_state["result_text"] = run_analysis(Coords(lat=lat_val, lon=lon_val))
+    result = run_analysis(Coords(lat=lat_val, lon=lon_val))
+    
+    if result:
+        st.session_state["result_text"] = result
+        st.session_state["api_error"] = ""
+    else:
+        st.session_state["result_text"] = ""
+        st.session_state["api_error"] = "Не удалось получить данные с сервера"
 
+def get_water_info_from_backend(coords: Coords) -> Optional[Dict[str, Any]]:
+    try:
+        response = requests.get(
+            WATER_INFO_ENDPOINT,
+            params={
+                "lat": coords.lat,
+                "lon": coords.lon
+            },
+            timeout=60  
+        )
+        response.raise_for_status()
+        return response.json()
+        
+    except requests.exceptions.ConnectionError:
+        st.error(" Не удалось подключиться к серверу. Проверьте, запущен ли бэкенд.")
+        return None
+    except requests.exceptions.Timeout:
+        st.error(" Превышено время ожидания ответа от сервера.")
+        return None
+    except requests.exceptions.HTTPError as e:
+        st.error(f" Ошибка сервера: {e}")
+        return None
+    except Exception as e:
+        st.error(f" Неизвестная ошибка: {e}")
+        return None
+    
+def format_result_from_backend(api_response: Dict[str, Any], coords: Coords) -> str:
+    water_type = api_response.get("water_type")
+    ecological_status = api_response.get("ecological_status")
+    
+    return (
+        f"Тип водоёма: {water_type}\n\n"
+        f"Экологический статус: {ecological_status}\n\n"
+        f"Координаты: {coords.lat:.6f}, {coords.lon:.6f}"
+    )
 
 def run_analysis(coords: Coords) -> str:
-    return (
-        f"✅ Тип водоёма: озеро\n\n"
-        f"📊 ИЗВ: 0.20\n\n"
-        f"📍 Координаты: {coords.lat:.6f}, {coords.lon:.6f}"
-    )
+    with st.spinner("Получение данных с сервера..."):
+        api_response = get_water_info_from_backend(coords)
+    if api_response:
+        return format_result_from_backend(api_response, coords)
+    else:
+        return (
+            f"Данные с сервера не получены\n\n" 
+        )
 
 
 def build_map_figure(lat: float, lon: float, zoom: int, map_style: str) -> go.Figure:
@@ -163,10 +209,24 @@ if "map_zoom" not in st.session_state:
     st.session_state["map_zoom"] = 10
 if "map_style_label" not in st.session_state:
     st.session_state["map_style_label"] = "Спутник"
+if "api_error" not in st.session_state:
+    st.session_state["api_error"] = ""
 
 
 st.title("🧭 Анализ по координатам")
 st.write("Введите широту и долготу вручную. Карта ниже обновится по выбранной точке.")
+
+@st.cache_data(ttl=60) 
+def check_backend_health():
+    try:
+        response = requests.get(f"{BACKEND_URL}/", timeout=2)
+        return response.status_code == 200
+    except:
+        return False
+if check_backend_health():
+    st.sidebar.success("Бэкенд подключен")
+else:
+    st.sidebar.error("Бэкенд не отвечает")
 
 col1, col2 = st.columns(2)
 
@@ -203,6 +263,8 @@ with b2:
         width="stretch",
         on_click=reset_coords,
     )
+if st.session_state.get("api_error"):
+    st.warning(st.session_state["api_error"])
 
 if st.session_state["result_text"]:
     st.success("Анализ выполнен!")
