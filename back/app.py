@@ -1,10 +1,10 @@
 from routers import methods
+from model import integrated_water_classifiers, calculate_ndci
 
 from fastapi import FastAPI, APIRouter, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-
-import calculate_ndci
+from fastapi.middleware.cors import CORSMiddleware 
 
 import uvicorn
 import os
@@ -15,6 +15,13 @@ filename = os.path.splitext(file)[0]
 app = FastAPI()
 router = APIRouter()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8501", "http://127.0.0.1:8501"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @router.get("/")
 async def redirect_to_docs():
@@ -24,9 +31,9 @@ async def redirect_to_docs():
 @app.get("/water-info")
 async def get_water_info(
     request: Request,
-    lat: float = Query(default=59.938784, ge=0, le=90),
-    lon: float = Query(default=30.314997, ge=0, le=180),
-    buffer_km: float = Query(default=0.25), 
+    lat: float = Query(default=59.938784, ge=-90, le=90),
+    lon: float = Query(default=30.314997, ge=-180, le=180),
+    buffer_km: float = Query(default=6.0), 
     start_date: str = Query(default='2025-06-01'),
     end_date: str = Query(default='2025-08-31'),
 ):
@@ -37,7 +44,7 @@ async def get_water_info(
         lon, lat, buffer_km, start_date, end_date
     )
     
-    result = await methods.integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
+    result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
     result["annotated_url"] = f"{request.base_url}{result["annotated_url"]}"
     result["eutrophication_stats"] = calculate_ndci.get_eutrophication_stats(lon, lat, buffer_km, start_date, end_date)
     return result
