@@ -7,15 +7,13 @@ from typing import Tuple, Optional, Dict, Any
 def get_satellite_image(
         lon: float,                 
         lat: float, 
-        buffer_km: float = 5.0, 
-        start_date: str = '2023-06-01',
-        end_date: str = '2023-08-31',
+        buffer_km: float = 6.0, 
+        start_date: str = '2025-06-01',
+        end_date: str = '2025-08-31',
         json_filename: Optional[str] = None,
         open_browser: bool = False
 ) -> Tuple[Optional[ee.Image], Optional[ee.Geometry], Optional[str], Optional[Dict[str, Any]]]:
     
-    ee.Authenticate()
-    ee.Initialize(project='mseml-488016')
     """
     Получение спутникового снимка
     """
@@ -42,7 +40,6 @@ def get_satellite_image(
         'format': 'png',
         'min': 0,
         'max': 3000,
-        'gamma': 1.4
     })
 
     info = image.getInfo()
@@ -79,8 +76,11 @@ def get_satellite_image(
 
 if __name__ == "__main__":
     lon, lat = 30.3141, 59.9386
-    buffer_km = 1
-    start_date, end_date = '2023-06-01', '2023-08-31'
+    buffer_km = 6
+    start_date, end_date = '2025-06-01', '2025-08-31'
+    
+    ee.Authenticate()
+    ee.Initialize(project='mseml-488016')
     
     image, region, url, metadata = get_satellite_image(
         lon=lon, lat=lat, buffer_km=buffer_km, 

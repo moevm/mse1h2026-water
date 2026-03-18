@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 import requests 
 import plotly.graph_objects as go
 import streamlit as st
+import json
 
 
 st.set_page_config(
@@ -143,12 +144,16 @@ def get_water_info_from_backend(coords: Coords) -> Optional[Dict[str, Any]]:
         return None
     
 def format_result_from_backend(api_response: Dict[str, Any], coords: Coords) -> str:
-    water_type = api_response.get("water_type")
-    ecological_status = api_response.get("ecological_status")
+    url = api_response.get("annotated_url")
+    results = api_response.get("results")[:2]
+    ecological_status = api_response.get("eutrophication_stats")
     
     return (
-        f"Тип водоёма: {water_type}\n\n"
-        f"Экологический статус: {ecological_status}\n\n"
+        f"Ссылка: {url}\n\n"
+        f"Результаты (первые 2 элемента):\n\n"
+        f"```json\n{json.dumps(results, indent=4, ensure_ascii=False)}\n```\n\n"
+        f"Экологический статус:\n\n"
+        f"```json\n{json.dumps(ecological_status, indent=4, ensure_ascii=False)}\n```\n\n"
         f"Координаты: {coords.lat:.6f}, {coords.lon:.6f}"
     )
 

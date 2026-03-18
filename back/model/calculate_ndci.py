@@ -6,9 +6,9 @@ from typing import Optional, Dict, Any
 def get_eutrophication_stats(
     lon: float, 
     lat: float, 
-    buffer_km: float = 5.0, 
-    start_date: str = '2023-07-01', 
-    end_date: str = '2023-08-31',
+    buffer_km: float = 6.0, 
+    start_date: str = '2025-06-01', 
+    end_date: str = '2025-08-31',
     ndci_threshold: float = 0.1,
     json_filename: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:

@@ -1,11 +1,25 @@
-from API import get_satellite_image
+from model.download_images import get_satellite_image
+
+import asyncio
 import numpy as np
 import cv2
 import requests
 import os
+import base64
+import uuid
 
 
-def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, file_to_save="cv_water_objects.png"):
+async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, file_to_save=None, is_create_file_with_url=True):
+    """
+    Классификация водоемов через OpenCV
+    Работает:
+      - с image_data + region (model Image)
+      - с image_source (локальный файл или URL)
+    """
+
+    # =========================
+    # Получение изображения
+    # =========================
     if image_source:
         if image_source.startswith("http://") or image_source.startswith("https://"):
             resp = requests.get(image_source)
@@ -73,7 +87,7 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
     water_mask = cv2.morphologyEx(water_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
     contours, _ = cv2.findContours(water_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+    
     results = []
     obj_id = 1
     h_img, w_img = annotated.shape[:2]
@@ -84,6 +98,11 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
         "болото": (0, 0, 255),   
         "озеро": (255, 0, 0)    
     }
+
+    if region is not None:
+        bounds = region.bounds().getInfo()['coordinates'][0]
+        min_lon, min_lat = bounds[0]
+        max_lon, max_lat = bounds[2]
 
     if region is not None:
         bounds = region.bounds().getInfo()['coordinates'][0]
@@ -101,7 +120,7 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
 
         x, y, w_box, h_box = cv2.boundingRect(cnt)
         roi = water_mask[y:y+h_box, x:x+w_box]
-        water_ratio = np.sum(roi > 0) / (w_box * h_box + 1e-6) 
+        water_ratio = np.sum(roi > 0) / (w_box * h_box + 1e-6)
 
         if area < 100:
             water_type = "пруд"
@@ -128,7 +147,7 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
             "elongation": float(elongation),
             "type": water_type,
             "center_x": cx,
-            "center_y": cy
+            "center_y": cy,
         }
 
         if region is not None:
@@ -140,8 +159,20 @@ def cv_integrated_water_classifier(image_data=None, region=None, image_source=No
         results.append(result)
         obj_id += 1
 
-    cv2.imwrite(file_to_save, annotated)
-    return results
+    if file_to_save:
+        cv2.imwrite(file_to_save, annotated)
+        
+    if is_create_file_with_url:
+        unique_filename = f"{uuid.uuid4()}.png"
+        save_path = os.path.join("img/classified", unique_filename)
+        cv2.imwrite(save_path, annotated)
+        annotated_url = f"img/classified/{unique_filename}"
+    
+    return {
+        'annotated_url': annotated_url,
+        'results': results,
+    }
+
 
 if __name__ == "__main__":
 
@@ -149,5 +180,5 @@ if __name__ == "__main__":
 
     image, region, url, metadata = get_satellite_image(lon, lat, buffer_km=6)
 
-    cv_results = cv_integrated_water_classifier(image, region, url)
+    cv_results = cv_integrated_water_classifier(image, region, url, file_to_save="cv_water_objects.png")
     print(cv_results)
