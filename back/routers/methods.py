@@ -1,7 +1,4 @@
-from model import download_images
-from model import integrated_water_classifiers
-from model import water_detector
-import calculate_ndci
+from model import download_images, integrated_water_classifiers, water_detector, calculate_ndci
 
 from typing import Any, Dict
 from pydantic import BaseModel
@@ -39,15 +36,15 @@ def initialize_ee():
     global _ee_initialized
     if not _ee_initialized:
         ee.Authenticate()
-        ee.Initialize(project='mseml-488016')
+        ee.Initialize(project=os.getenv('EE_PROJECT_NAME', 'mseml-488016'))
         _ee_initialized = True
 
 
 @router.get("/get_satellite_image")
 async def get_satellite_image(
-    lat: float = Query(default=59.938784, ge=0, le=90),
-    lon: float = Query(default=30.314997, ge=0, le=180),
-    buffer_km: float = Query(default=0.25), 
+    lat: float = Query(default=59.938784, ge=-90, le=90),
+    lon: float = Query(default=30.314997, ge=-180, le=180),
+    buffer_km: float = Query(default=6.0), 
     start_date: str = Query(default='2025-06-01'),
     end_date: str = Query(default='2025-08-31'),
 ):
@@ -82,8 +79,8 @@ async def cv_integrated_water_classifier(
 
 @router.get("/water_detector")
 async def water_detector_endpoint(
-    lat: float = Query(default=59.938784, ge=0, le=90),
-    lon: float = Query(default=30.314997, ge=0, le=180),
+    lat: float = Query(default=59.938784, ge=-90, le=90),
+    lon: float = Query(default=30.314997, ge=-180, le=180),
     radius: int = Query(default=50), 
 ):
     
@@ -92,11 +89,11 @@ async def water_detector_endpoint(
 
 @router.get("/get_eutrophication_stats")
 async def get_eutrophication_stats(
-    lat: float = Query(default=59.938784, ge=0, le=90),
-    lon: float = Query(default=30.314997, ge=0, le=180),
-    buffer_km: float = 5.0, 
-    start_date: str = '2023-07-01', 
-    end_date: str = '2023-08-31',
+    lat: float = Query(default=59.938784, ge=-90, le=90),
+    lon: float = Query(default=30.314997, ge=-180, le=180),
+    buffer_km: float = 6.0,
+    start_date: str = '2025-06-01',
+    end_date: str = '2025-08-31',
     ndci_threshold: float = 0.1,
 ):
     

@@ -7,12 +7,13 @@ from typing import Tuple, Optional, Dict, Any
 def get_satellite_image(
         lon: float,                 
         lat: float, 
-        buffer_km: float = 5.0, 
-        start_date: str = '2023-06-01',
-        end_date: str = '2023-08-31',
+        buffer_km: float = 6.0, 
+        start_date: str = '2025-06-01',
+        end_date: str = '2025-08-31',
         json_filename: Optional[str] = None,
         open_browser: bool = False
 ) -> Tuple[Optional[ee.Image], Optional[ee.Geometry], Optional[str], Optional[Dict[str, Any]]]:
+    
     """
     Получение спутникового снимка
     """
@@ -31,7 +32,7 @@ def get_satellite_image(
         print("Нет изображений за указанный период")
         return None, None, None, None
 
-    rgb_image = image.select(['B4', 'B3', 'B2', 'B8'])
+    rgb_image = image.select(['B4', 'B3', 'B2', 'B8', 'B11'])
     
     url = rgb_image.getThumbURL({
         'region': region,
@@ -61,7 +62,7 @@ def get_satellite_image(
             "end": end_date
         },
         "thumbnail_url": url,
-        "bands_used": ["B4", "B3", "B2", "B8"],
+        "bands_used": ['B4', 'B3', 'B2', 'B8', 'B11'],
         "created_at": datetime.now().isoformat()
     }
 
@@ -75,12 +76,12 @@ def get_satellite_image(
     return rgb_image, region, url, image_metadata
 
 if __name__ == "__main__":
+    lon, lat = 30.3141, 59.9386
+    buffer_km = 6
+    start_date, end_date = '2025-06-01', '2025-08-31'
+    
     ee.Authenticate()
     ee.Initialize(project='mseml-488016')
-
-    lon, lat = 30.3141, 59.9386
-    buffer_km = 10
-    start_date, end_date = '2023-06-01', '2023-08-31'
     
     image, region, url, metadata = get_satellite_image(
         lon=lon, lat=lat, buffer_km=buffer_km, 
