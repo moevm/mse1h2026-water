@@ -1,0 +1,33 @@
+# How to build
+# docker build --no-cache -f back/Dockerfile -t water-backend .
+# How to up
+# docker run --rm -p 8000:8000 --env-file .env -v "${PWD}\back\credentials:/app/credentials:ro" water-backend
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libgl1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN python -m pip install --upgrade pip && \
+    python -m pip install -r requirements.txt
+
+COPY back/ ./
+
+RUN mkdir -p /app/credentials /app/output
+
+EXPOSE 8000
+
+CMD ["python", "-X", "utf8", "-m", "uvicorn", "app:app", "--host=0.0.0.0", "--port=8000"]

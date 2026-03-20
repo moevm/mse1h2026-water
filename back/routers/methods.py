@@ -1,4 +1,5 @@
 from model import download_images, integrated_water_classifiers, water_detector, calculate_ndci
+from ee_auth import initialize_ee
 
 from typing import Any, Dict
 from pydantic import BaseModel
@@ -6,7 +7,6 @@ from fastapi import FastAPI, APIRouter, Query, Request
 
 import uvicorn
 import os
-import ee
 
 
 file = os.path.basename(__file__)
@@ -14,9 +14,6 @@ filename = os.path.splitext(file)[0]
 
 app = FastAPI()
 router = APIRouter(prefix=f"/{filename}")
-
-_ee_initialized = False
-
 
 class SatelliteImageMetadata(BaseModel):
     image_id: str
@@ -30,16 +27,6 @@ class SatelliteImageMetadata(BaseModel):
     thumbnail_url: str = None
     bands_used: list = None
     created_at: str = None
-
-
-def initialize_ee():
-    global _ee_initialized
-    if not _ee_initialized:
-        ee.Authenticate()
-        ee.Initialize(project=os.getenv('EE_PROJECT_NAME', 'mseml-488016'))
-        _ee_initialized = True
-
-
 @router.get("/get_satellite_image")
 async def get_satellite_image(
     lat: float = Query(default=59.938784, ge=-90, le=90),

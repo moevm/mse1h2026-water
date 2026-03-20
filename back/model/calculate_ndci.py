@@ -3,6 +3,15 @@ import json
 from datetime import datetime
 from typing import Optional, Dict, Any
 
+try:
+    from ee_auth import initialize_ee
+except ModuleNotFoundError:
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from ee_auth import initialize_ee
+
 def get_eutrophication_stats(
     lon: float, 
     lat: float, 
@@ -78,8 +87,7 @@ def get_eutrophication_stats(
     return result_data
 
 if __name__ == "__main__":
-    ee.Authenticate()
-    ee.Initialize(project='mseml-488016')
+    initialize_ee()
 
     lon, lat = 30.4677, 59.9226
     buffer_km = 0.5
