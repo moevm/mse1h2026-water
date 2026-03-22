@@ -30,7 +30,7 @@ button[title="Deploy"] {
 )
 
 FLOAT_RE = re.compile(r"^\s*[-+]?\d+(?:\.\d+)?\s*$")
-BACKEND_URL = "http://localhost:8000" 
+BACKEND_URL = "http://backend:8000"
 WATER_INFO_ENDPOINT = f"{BACKEND_URL}/water-info"
 
 @dataclass(frozen=True)
