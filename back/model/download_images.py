@@ -4,6 +4,15 @@ import webbrowser
 from datetime import datetime
 from typing import Tuple, Optional, Dict, Any
 
+try:
+    from ee_auth import initialize_ee
+except ModuleNotFoundError:
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from ee_auth import initialize_ee
+
 def get_satellite_image(
         lon: float,                 
         lat: float, 
@@ -79,8 +88,7 @@ if __name__ == "__main__":
     buffer_km = 6
     start_date, end_date = '2025-06-01', '2025-08-31'
     
-    ee.Authenticate()
-    ee.Initialize(project='mseml-488016')
+    initialize_ee()
     
     image, region, url, metadata = get_satellite_image(
         lon=lon, lat=lat, buffer_km=buffer_km, 
