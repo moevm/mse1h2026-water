@@ -60,7 +60,7 @@ async def cv_integrated_water_classifier(
     )
     
     result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
-    result["annotated_url"] = f"{request.base_url}{result["annotated_url"]}"
+    result["annotated_url"] = f"{request.base_url}{result['annotated_url']}"
     return result
 
 

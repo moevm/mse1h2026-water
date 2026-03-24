@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: back/Dockerfile
+    container_name: water-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./back/credentials:/app/credentials:ro
+      - ./back/output:/app/output
+      - ./back/img/classified:/app/img/classified
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: front/Dockerfile
+    container_name: water-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
