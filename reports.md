@@ -11,11 +11,45 @@
 3. результат один из 4 типов водоемов (озеро, река, болото, пруд) и 2 экологических статуса (ИЗВ, эвтрофикация)
 4. классифицировать водоем по открытым данным и/или обученной модели
 
+### Требования к запросам :
+* GET [/water-info](http://127.0.0.1:8000/docs#/default/get_water_info_water_info_get) - получение информации о водоеме
+* GET [/](http://127.0.0.1:8000/docs#/default/redirect_to_docs__get)  - документация
+* GET [/methods/get_satellite_image](http://127.0.0.1:8000/docs#/default/get_satellite_image_methods_get_satellite_image_get) - получение изображения  
+Результат можно напрямую передать в следующий метод  
+* POST [/methods/cv_integrated_water_classifier](http://127.0.0.1:8000/docs#/default/cv_integrated_water_classifier_methods_cv_integrated_water_classifier_post) - Классификации водоемов через OpenCV
+* GET [/methods/water_detector](http://127.0.0.1:8000/docs#/default/water_detector_endpoint_methods_water_detector_get) - получение данных их overpass api
+* GET [/methods/get_eutrophication_stats](http://127.0.0.1:8000/docs#/default/get_eutrophication_stats_methods_get_eutrophication_stats_get) - получение данных из gee api
+
+
 Технологии: Python, scikit-learn / TensorFlow, Google Earth Engine API, FastAPI.
 ### Сценарии использования
 Основной сценарий использования:
 1. Пользователь вводит координаты и нажимает на кнопку проверки
 2. Система отображает тип и экологический статус
+
+Основной сценарий обращения к API:
+1. Пользователь обращается по пути [water-info](http://127.0.0.1:8000/docs#/default/get_water_info_water_info_get)
+2. Система возвращает информация о водоеме
+
+Альтернативный сценарий обращения к API:
+1. Пользователь обращается по пути /
+2. Система отображает докуменацию
+
+Альтернативный сценарий обращения к API:
+1. Пользователь обращается по пути [/methods/get_satellite_image](http://127.0.0.1:8000/docs#/default/get_satellite_image_methods_get_satellite_image_get) 
+2. Система возвращает изображение
+
+Альтернативный сценарий обращения к API:
+1. Пользователь обращается по пути [/methods/](http://127.0.0.1:8000/docs#/default/get_satellite_image_methods_get_satellite_image_get)[cv_integrated_water_classifier](http://127.0.0.1:8000/docs#/default/cv_integrated_water_classifier_methods_cv_integrated_water_classifier_post) и передает данные об изображении
+2. Система возвращает информацию о водоеме
+
+Альтернативный сценарий обращения к API:
+1. Пользователь обращается по пути [/methods/](http://127.0.0.1:8000/docs#/default/get_satellite_image_methods_get_satellite_image_get)[water_detector](http://127.0.0.1:8000/docs#/default/water_detector_endpoint_methods_water_detector_get) 
+2. Система возвращает данные о водоеме из overpass api
+
+Альтернативный сценарий обращения к API:
+1. Пользователь обращается по пути [/methods/](http://127.0.0.1:8000/docs#/default/get_satellite_image_methods_get_satellite_image_get)[get_eutrophication_stats](http://127.0.0.1:8000/docs#/default/get_eutrophication_stats_methods_get_eutrophication_stats_get)
+2. Система возвращает данные о водоеме из gee api
 
 Макет
 ![Макет](docs/ui.png)
