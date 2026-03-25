@@ -54,7 +54,9 @@
 
 ## Итерация №2
 ### Презентация
-[Презентация 2]()
+[Презентация 2](https://github.com/moevm/mse1h2026-water/blob/reports/docs/Итерация%202.pdf)
+### Видео демострация
+[скринкаст](https://github.com/moevm/mse1h2026-water/blob/reports/docs/iter2.mp4)
 ### Запланированные задачи
 1. Автоматизировать запуск
 2. Написать Dockerfile для front
