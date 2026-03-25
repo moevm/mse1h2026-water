@@ -68,7 +68,7 @@
 2. Написан Dockerfile для front
 3. Написан Dockerfile для back
 4. Написан docker compose файл
-5. Улучшена работа модели (ускорение работы)
+5. Улучшена работа модели (ускорение работы, определение оптимального радиуса 6 км)
 6. Связаны отдельные компоненты (back и front, модель добавлена в back)
 
 Front - https://fairly-supportive-skimmer.cloudpub.ru/  
