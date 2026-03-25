@@ -117,4 +117,7 @@ GET /methods/get_eutrophication_stats - получение данных из gee
 2. перейти на страницу http://localhost:8501 - для проверки front
    можно вводить данные координат, ответ возвращается от сервера
 
+Также можно проверить работоспособность по следующим ссылкам  
 
+https://fairly-supportive-skimmer.cloudpub.ru/ - front  
+https://ghostly-direct-gerbil.cloudpub.ru/ - api
