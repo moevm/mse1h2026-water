@@ -42,5 +42,3 @@ GET /methods/get_eutrophication_stats - получение данных из gee
 * https://ghostly-direct-gerbil.cloudpub.ru/ - api
 ## Дополнительная информация
 
-* https://fairly-supportive-skimmer.cloudpub.ru/ - front
-* https://ghostly-direct-gerbil.cloudpub.ru/ - api
