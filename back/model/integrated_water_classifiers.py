@@ -1,4 +1,5 @@
 from model.download_images import get_satellite_image
+from water_utils import get_water_mask_gee
 
 import asyncio
 import numpy as np
@@ -51,13 +52,7 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
     annotated = img.copy()
 
     if image_data is not None:
-        swir1 = image_data.select('B11')
-        ndwi  = image_data.normalizedDifference(['B3', 'B8']) 
-
-        water_mask_gee = (
-            ndwi.gt(-0.006)         
-            .And(swir1.lt(1600))  
-        )
+        water_mask_gee = get_water_mask_gee(image_data)
 
         mask_thumb_url = water_mask_gee.getThumbURL({
             'region': region,
