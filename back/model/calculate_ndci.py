@@ -2,6 +2,7 @@ import ee
 import json
 from datetime import datetime
 from typing import Optional, Dict, Any
+from water_utils import get_water_mask_gee
 
 try:
     from ee_auth import initialize_ee
@@ -34,9 +35,7 @@ def get_eutrophication_stats(
         return None
 
     image = collection.first()
-
-    ndwi = image.normalizedDifference(['B3', 'B8'])
-    water_mask = ndwi.gt(0)
+    water_mask = get_water_mask_gee(image)
 
     ndci = image.normalizedDifference(['B5', 'B4'])
     polluted_mask = ndci.gt(ndci_threshold).And(water_mask)
