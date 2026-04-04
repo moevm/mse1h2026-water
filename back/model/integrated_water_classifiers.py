@@ -5,21 +5,23 @@ import numpy as np
 import cv2
 import requests
 import os
-import base64
 import uuid
 
 
-async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, file_to_save=None, is_create_file_with_url=True):
+async def cv_integrated_water_classifier(image_data, region=None, image_source=None, file_to_save=None, is_create_file_with_url=True):
     """
-    Классификация водоемов через OpenCV
-    Работает:
-      - с image_data + region (model Image)
-      - с image_source (локальный файл или URL)
+    Классификация водоемов через OpenCV по данным с ИК-каналами (GEE).
+    Для классификации требуется image_data и region.
+    image_source используется только для получения визуального изображения для разметки.
     """
 
     # =========================
     # Получение изображения
     # =========================
+
+    if image_data is None or region is None:
+        raise ValueError("Для классификации требуются image_data и region с ИК-каналами")
+
     if image_source:
         if image_source.startswith("http://") or image_source.startswith("https://"):
             resp = requests.get(image_source)
@@ -33,7 +35,7 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
         if img is None:
             raise ValueError("Не удалось загрузить изображение")
 
-    elif image_data is not None and region is not None:
+    else:
         thumb_url = image_data.getThumbURL({
             'region': region,
             'dimensions': 1024,
@@ -45,43 +47,33 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
         arr = np.frombuffer(resp.content, np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
-    else:
-        raise ValueError("Не указаны ни image_source, ни image_data + region")
-
     annotated = img.copy()
 
-    if image_data is not None:
-        swir1 = image_data.select('B11')
-        ndwi  = image_data.normalizedDifference(['B3', 'B8']) 
 
-        water_mask_gee = (
-            ndwi.gt(-0.006)         
-            .And(swir1.lt(1600))  
-        )
+    swir1 = image_data.select('B11')
+    ndwi  = image_data.normalizedDifference(['B3', 'B8']) 
 
-        mask_thumb_url = water_mask_gee.getThumbURL({
-            'region': region,
-            'dimensions': 1024,
-            'format': 'png',
-            'min': 0,
-            'max': 1
-        })
+    water_mask_gee = (
+        ndwi.gt(-0.006)         
+        .And(swir1.lt(1600))  
+    )
 
-        resp = requests.get(mask_thumb_url)
-        arr = np.frombuffer(resp.content, np.uint8)
-        water_mask = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+    mask_thumb_url = water_mask_gee.getThumbURL({
+        'region': region,
+        'dimensions': 1024,
+        'format': 'png',
+        'min': 0,
+        'max': 1
+    })
 
-        if water_mask is None:
-            raise ValueError("Не удалось загрузить водную маску")
+    resp = requests.get(mask_thumb_url)
+    arr = np.frombuffer(resp.content, np.uint8)
+    water_mask = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
 
-        water_mask = (water_mask > 127).astype(np.uint8) * 255
+    if water_mask is None:
+        raise ValueError("Не удалось загрузить водную маску")
 
-    else:
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        R = img_rgb[:, :, 0].astype(float)
-        G = img_rgb[:, :, 1].astype(float)
-        ndwi = (G - R) / (G + R + 1e-6)
-        water_mask = (ndwi > 0.2).astype(np.uint8) * 255
+    water_mask = (water_mask > 127).astype(np.uint8) * 255
 
     kernel = np.ones((2, 2), np.uint8)
     water_mask = cv2.morphologyEx(water_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
@@ -99,15 +91,9 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
         "озеро": (255, 0, 0)    
     }
 
-    if region is not None:
-        bounds = region.bounds().getInfo()['coordinates'][0]
-        min_lon, min_lat = bounds[0]
-        max_lon, max_lat = bounds[2]
-
-    if region is not None:
-        bounds = region.bounds().getInfo()['coordinates'][0]
-        min_lon, min_lat = bounds[0]
-        max_lon, max_lat = bounds[2]
+    bounds = region.bounds().getInfo()['coordinates'][0]
+    min_lon, min_lat = bounds[0]
+    max_lon, max_lat = bounds[2]
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
@@ -150,14 +136,15 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
             "center_y": cy,
         }
 
-        if region is not None:
-            lon = min_lon + (cx / w_img) * (max_lon - min_lon)
-            lat = max_lat - (cy / h_img) * (max_lat - min_lat)
-            result["lon"] = lon
-            result["lat"] = lat
+        lon = min_lon + (cx / w_img) * (max_lon - min_lon)
+        lat = max_lat - (cy / h_img) * (max_lat - min_lat)
+        result["lon"] = lon
+        result["lat"] = lat
 
         results.append(result)
         obj_id += 1
+
+    annotated_url = None
 
     if file_to_save:
         cv2.imwrite(file_to_save, annotated)
