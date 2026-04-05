@@ -20,7 +20,8 @@ def get_satellite_image(
         start_date: str = '2025-06-01',
         end_date: str = '2025-08-31',
         json_filename: Optional[str] = None,
-        open_browser: bool = False
+        open_browser: bool = False,
+        thumbnail_url: Optional[str] = None, 
 ) -> Tuple[Optional[ee.Image], Optional[ee.Geometry], Optional[str], Optional[Dict[str, Any]]]:
     
     """
@@ -29,6 +30,37 @@ def get_satellite_image(
 
     point = ee.Geometry.Point([lon, lat])
     region = point.buffer(buffer_km * 1000).bounds()
+
+    if thumbnail_url:
+        image_metadata = {
+            "image_id": None,
+            "satellite": "Sentinel-2",
+            "collection": "COPERNICUS/S2_SR_HARMONIZED",
+            "acquisition_date": None,
+            "cloud_percentage": None,
+            "coordinates_center": {
+                "longitude": lon,
+                "latitude": lat
+            },
+            "buffer_km": buffer_km,
+            "date_range": {
+                "start": start_date,
+                "end": end_date
+            },
+            "thumbnail_url": thumbnail_url,
+            "bands_used": ['B4', 'B3', 'B2', 'B8', 'B11'],
+            "created_at": datetime.now().isoformat()
+        }
+
+        if json_filename:
+            with open(json_filename, 'w', encoding='utf-8') as f:
+                json.dump(image_metadata, f, ensure_ascii=False, indent=4)
+
+        if open_browser:
+            webbrowser.open(thumbnail_url)
+
+        return None, region, thumbnail_url, image_metadata
+    print(">>> get_satellite_image CALLED: 1")
 
     collection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
         .filterDate(start_date, end_date) \
