@@ -9,7 +9,11 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_EXTRA_INDEX_URL=https://pypi.org/simple \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
@@ -19,14 +23,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY back/requirements.txt ./requirements.txt
 
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt
 
 COPY back/ ./
 
-RUN mkdir -p /app/credentials /app/output
+RUN mkdir -p /app/credentials /app/output /app/img/classified
 
 EXPOSE 8000
 
