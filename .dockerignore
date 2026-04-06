@@ -1,0 +1,11 @@
+.git
+.venv
+.vscode
+.idea
+__pycache__
+*.pyc
+.pytest_cache
+.env
+back/credentials
+back/output
+back/img/classified
