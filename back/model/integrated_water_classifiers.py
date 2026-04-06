@@ -7,9 +7,11 @@ import cv2
 import requests
 import os
 import uuid
+import json
 
 
-async def cv_integrated_water_classifier(image_data, region=None, image_source=None, file_to_save=None, is_create_file_with_url=True):
+async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, file_to_save=None, is_create_file_with_url=True, is_create_geojson=True):
+
     """
     Классификация водоемов через OpenCV по данным с ИК-каналами (GEE).
     Для классификации требуется image_data и region.
@@ -130,6 +132,7 @@ async def cv_integrated_water_classifier(image_data, region=None, image_source=N
             "type": water_type,
             "center_x": cx,
             "center_y": cy,
+            "contour": cnt,
         }
 
         lon = min_lon + (cx / w_img) * (max_lon - min_lon)
@@ -140,8 +143,9 @@ async def cv_integrated_water_classifier(image_data, region=None, image_source=N
         results.append(result)
         obj_id += 1
 
-    annotated_url = None
 
+    answer = {'results': results}
+    
     if file_to_save:
         cv2.imwrite(file_to_save, annotated)
         
@@ -150,11 +154,63 @@ async def cv_integrated_water_classifier(image_data, region=None, image_source=N
         save_path = os.path.join("img/classified", unique_filename)
         cv2.imwrite(save_path, annotated)
         annotated_url = f"img/classified/{unique_filename}"
+        answer['annotated_url'] = annotated_url
     
-    return {
-        'annotated_url': annotated_url,
-        'results': results,
-    }
+    geojson_path = None
+    if is_create_geojson:
+        features = []
+        
+        for result in results:
+            cnt = result.pop("contour")  # Удаляем контур из результата
+            
+            # Преобразуем координаты пикселей в lon/lat
+            coordinates = []
+            for point in cnt:
+                x, y = point[0]
+                if region is not None:
+                    lon = min_lon + (x / w_img) * (max_lon - min_lon)
+                    lat = max_lat - (y / h_img) * (max_lat - min_lat)
+                else:
+                    lon, lat = float(x), float(y)
+                coordinates.append([lon, lat])
+            
+            # Замыкаем полигон
+            if coordinates and coordinates[0] != coordinates[-1]:
+                coordinates.append(coordinates[0])
+            
+            # Создаем GeoJSON feature
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "id": result["id"],
+                    "type": result["type"],
+                    "area_pixels": result["area_pixels"],
+                    "elongation": result["elongation"]
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [coordinates]
+                }
+            }
+            
+            features.append(feature)
+        
+        # Создаем FeatureCollection
+        geojson_data = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        
+        # Сохраняем в файл
+        os.makedirs("geojson", exist_ok=True)
+        geojson_filename = f"{uuid.uuid4()}.geojson"
+        geojson_path = os.path.join("geojson", geojson_filename)
+        with open(geojson_path, 'w', encoding='utf-8') as f:
+            json.dump(geojson_data, f, ensure_ascii=False, indent=2)
+
+        answer['geojson_path'] = "geojson/" + geojson_filename
+        
+    return answer
 
 
 if __name__ == "__main__":
