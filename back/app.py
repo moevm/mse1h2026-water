@@ -46,6 +46,7 @@ async def get_water_info(
     
     result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
     result["annotated_url"] = f"{request.base_url}{result['annotated_url']}"
+    result["geojson_path"] = f"{request.base_url}{result['geojson_path']}"
     result["eutrophication_stats"] = calculate_ndci.get_eutrophication_stats(lon, lat, buffer_km, start_date, end_date)
     return result
 
@@ -53,8 +54,9 @@ async def get_water_info(
 app.include_router(router)
 app.include_router(methods.router)
 os.makedirs("img/classified", exist_ok=True)
+os.makedirs("geojson", exist_ok=True)
 app.mount("/img/classified", StaticFiles(directory="img/classified"), name="Классифицированные изображения")
-
+app.mount("/geojson", StaticFiles(directory="geojson"), name="GeoJSON файлы")
 
 if __name__ == "__main__":
     # Если нужно резко прерывать, то можно добавить timeout_graceful_shutdown=1

@@ -87,6 +87,23 @@ def reset_coords() -> None:
     st.session_state["map_style_label"] = "Спутник"
     st.session_state["api_error"] = "" 
 
+def update_map_from_input() -> None:
+    """Обновляет карту при изменении координат в полях ввода"""
+    lat_error = validate_lat(st.session_state["lat_text"])
+    lon_error = validate_lon(st.session_state["lon_text"])
+
+    st.session_state["lat_error"] = lat_error
+    st.session_state["lon_error"] = lon_error
+
+    # Обновляем карту только если оба значения валидны
+    if not lat_error and not lon_error:
+        lat_val = parse_float(st.session_state["lat_text"])
+        lon_val = parse_float(st.session_state["lon_text"])
+        
+        if lat_val is not None and lon_val is not None:
+            st.session_state["map_lat"] = lat_val
+            st.session_state["map_lon"] = lon_val
+
 def try_precheck_running() -> None:
     st.session_state["submitted"] = True
 
@@ -241,6 +258,7 @@ with col1:
         "Широта",
         key="lat_text",
         placeholder="например: 60.123456",
+        on_change=update_map_from_input,
     )
     if st.session_state["lat_error"]:
         st.error(st.session_state["lat_error"])
@@ -250,6 +268,7 @@ with col2:
         "Долгота",
         key="lon_text",
         placeholder="например: 30.123456",
+        on_change=update_map_from_input,
     )
     if st.session_state["lon_error"]:
         st.error(st.session_state["lon_error"])
