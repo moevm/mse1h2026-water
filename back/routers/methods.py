@@ -56,7 +56,8 @@ async def cv_integrated_water_classifier(
         lat=image_metadata["coordinates_center"]["latitude"],
         buffer_km=image_metadata["buffer_km"],
         start_date=image_metadata["date_range"]["start"],
-        end_date=image_metadata["date_range"]["end"]
+        end_date=image_metadata["date_range"]["end"],
+        thumbnail_url=image_metadata["thumbnail_url"], 
     )
     
     result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
