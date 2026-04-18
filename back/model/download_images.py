@@ -13,107 +13,91 @@ except ModuleNotFoundError:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
     from ee_auth import initialize_ee
 
-def get_satellite_image(
-        lon: float,                 
-        lat: float, 
-        buffer_km: float = 6.0, 
-        start_date: str = '2025-06-01',
-        end_date: str = '2025-08-31',
-        json_filename: Optional[str] = None,
-        open_browser: bool = False,
-        thumbnail_url: Optional[str] = None, 
-) -> Tuple[Optional[ee.Image], Optional[ee.Geometry], Optional[str], Optional[Dict[str, Any]]]:
-    
-    """
-    Получение спутникового снимка
-    """
 
+def build_region(lon: float, lat: float, buffer_km: float) -> ee.Geometry:
     point = ee.Geometry.Point([lon, lat])
-    region = point.buffer(buffer_km * 1000).bounds()
+    return point.buffer(buffer_km * 1000).bounds()
 
-    if thumbnail_url:
-        image_metadata = {
-            "image_id": None,
-            "satellite": "Sentinel-2",
-            "collection": "COPERNICUS/S2_SR_HARMONIZED",
-            "acquisition_date": None,
-            "cloud_percentage": None,
-            "coordinates_center": {
-                "longitude": lon,
-                "latitude": lat
-            },
-            "buffer_km": buffer_km,
-            "date_range": {
-                "start": start_date,
-                "end": end_date
-            },
-            "thumbnail_url": thumbnail_url,
-            "bands_used": ['B4', 'B3', 'B2', 'B8', 'B11'],
-            "created_at": datetime.now().isoformat()
-        }
-
-        if json_filename:
-            with open(json_filename, 'w', encoding='utf-8') as f:
-                json.dump(image_metadata, f, ensure_ascii=False, indent=4)
-
-        if open_browser:
-            webbrowser.open(thumbnail_url)
-
-        return None, region, thumbnail_url, image_metadata
-    print(">>> get_satellite_image CALLED: 1")
-
-    collection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
-        .filterDate(start_date, end_date) \
-        .filterBounds(region) \
+def build_collection(region: ee.Geometry, start_date: str, end_date: str):
+    return (
+        ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+        .filterDate(start_date, end_date)
+        .filterBounds(region)
         .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+    )
 
+def select_image(collection):
     image = collection.first()
-
     if image.getInfo() is None:
-        print("Нет изображений за указанный период")
-        return None, None, None, None
+        return None
+    return image
 
-    rgb_image = image.select(['B4', 'B3', 'B2', 'B8', 'B11'])
-    
-    url = rgb_image.getThumbURL({
+def build_thumbnail(image, region):
+    rgb = image.select(['B4', 'B3', 'B2', 'B8', 'B11'])
+    url = rgb.getThumbURL({
         'region': region,
         'dimensions': 1024,
         'format': 'png',
         'min': 0,
         'max': 3000,
     })
+    return rgb, url
 
-    info = image.getInfo()
-    properties = info.get('properties', {})
+def build_metadata(image_info, lon, lat, buffer_km, start_date, end_date, url):
+    props = image_info.get('properties', {}) if image_info else {}
 
-    image_metadata = {
-        "image_id": info.get('id'),
+    return {
+        "image_id": image_info.get('id') if image_info else None,
         "satellite": "Sentinel-2",
         "collection": "COPERNICUS/S2_SR_HARMONIZED",
-        "acquisition_date": properties.get('DATATAKE_IDENTIFIER'),
-        "cloud_percentage": properties.get('CLOUDY_PIXEL_PERCENTAGE'),
-        "coordinates_center": {
-            "longitude": lon,
-            "latitude": lat
-        },
+        "acquisition_date": props.get('DATATAKE_IDENTIFIER'),
+        "cloud_percentage": props.get('CLOUDY_PIXEL_PERCENTAGE'),
+        "coordinates_center": {"longitude": lon, "latitude": lat},
         "buffer_km": buffer_km,
-        "date_range": {
-            "start": start_date,
-            "end": end_date
-        },
+        "date_range": {"start": start_date, "end": end_date},
         "thumbnail_url": url,
         "bands_used": ['B4', 'B3', 'B2', 'B8', 'B11'],
         "created_at": datetime.now().isoformat()
     }
 
-    if json_filename:
-        with open(json_filename, 'w', encoding='utf-8') as f:
-            json.dump(image_metadata, f, ensure_ascii=False, indent=4)
-    
-    if open_browser:
-        webbrowser.open(url)
+def save_metadata(metadata, filename: str):
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=4)
 
-    return rgb_image, region, url, image_metadata
+def open_in_browser(url: str):
+    webbrowser.open(url)
+
+def get_satellite_image(
+    lon: float,
+    lat: float,
+    buffer_km: float = 6.0,
+    start_date: str = '2025-06-01',
+    end_date: str = '2025-08-31',
+    json_filename: str | None = None,
+    open_browser: bool = False,
+):
+    region = build_region(lon, lat, buffer_km)
+    collection = build_collection(region, start_date, end_date)
+
+    image = select_image(collection)
+    if image is None:
+        print("Нет изображений за указанный период")
+        return None, None, None, None
+
+    rgb, url = build_thumbnail(image, region)
+
+    info = image.getInfo()
+    metadata = build_metadata(
+        info, lon, lat, buffer_km, start_date, end_date, url
+    )
+
+    if json_filename:
+        save_metadata(metadata, json_filename)
+
+    if open_browser:
+        open_in_browser(url)
+
+    return rgb, region, url, metadata
 
 if __name__ == "__main__":
     lon, lat = 30.3141, 59.9386
