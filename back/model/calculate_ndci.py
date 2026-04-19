@@ -35,6 +35,61 @@ def _polluted_water_mask(
 ) -> ee.Image:
     return ndci.gt(ndci_threshold).And(water_mask)
 
+def _sum_water_and_polluted_areas_m2(
+    water_mask: ee.Image, polluted_mask: ee.Image, region: ee.Geometry
+) -> Dict[str, Any]:
+    pixel_area = ee.Image.pixelArea()
+    water_area_img = water_mask.multiply(pixel_area)
+    polluted_area_img = polluted_mask.multiply(pixel_area)
+    return (
+        water_area_img.addBands(polluted_area_img)
+        .reduceRegion(
+            reducer=ee.Reducer.sum(),
+            geometry=region,
+            scale=10,
+            maxPixels=1e9,
+        )
+        .getInfo()
+    )
+
+def _mean_ndci_over_water(
+    ndci: ee.Image, water_mask: ee.Image, region: ee.Geometry
+) -> Optional[float]:
+    stats = (
+        ndci.updateMask(water_mask)
+        .reduceRegion(
+            reducer=ee.Reducer.mean(),
+            geometry=region,
+            scale=10,
+            maxPixels=1e9,
+        )
+        .getInfo()
+    )
+    return stats.get("nd")
+
+def _assemble_result_payload(
+    lon: float,
+    lat: float,
+    ndci_mean_value: Optional[float],
+    total_water_sqm: float,
+    polluted_water_sqm: float,
+    polluted_percentage: float,
+    date_analyzed: str,
+) -> Dict[str, Any]:
+    return {
+        "coordinates": {"lon": lon, "lat": lat},
+        "ndci_mean": round(ndci_mean_value, 4) if ndci_mean_value else None,
+        "total_water_area_m2": round(total_water_sqm, 2),
+        "polluted_area_m2": round(polluted_water_sqm, 2),
+        "polluted_percentage": round(polluted_percentage, 2),
+        "date_analyzed": date_analyzed,
+        "calculated_at": datetime.now().isoformat(),
+    }
+
+def _write_result_json(payload: Dict[str, Any], json_filename: str) -> None:
+    with open(json_filename, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=4)
+
 def get_eutrophication_stats(
     lon: float, 
     lat: float, 
@@ -55,48 +110,30 @@ def get_eutrophication_stats(
     ndci = _ndci_image(image)
     polluted_mask = _polluted_water_mask(ndci, water_mask, ndci_threshold)
 
-    pixel_area = ee.Image.pixelArea()
-    water_area_img = water_mask.multiply(pixel_area)
-    polluted_area_img = polluted_mask.multiply(pixel_area)
-
-    stats = water_area_img.addBands(polluted_area_img).reduceRegion(
-        reducer=ee.Reducer.sum(),
-        geometry=region,
-        scale=10, 
-        maxPixels=1e9
-    ).getInfo()
-
-    total_water_sqm = stats.get('nd')
-    polluted_water_sqm = stats.get('nd_1')
+    area_stats = _sum_water_and_polluted_areas_m2(water_mask, polluted_mask, region)
+    total_water_sqm = area_stats.get("nd")
+    polluted_water_sqm = area_stats.get("nd_1")
 
     if not total_water_sqm or total_water_sqm == 0:
         print("В заданном радиусе не найдено водоемов.")
         return None
     
-    polluted_percentage = (polluted_water_sqm/total_water_sqm)*100
+    polluted_percentage = (polluted_water_sqm / total_water_sqm) * 100
+    ndci_mean_value = _mean_ndci_over_water(ndci, water_mask, region)
+    date_analyzed = image.get("DATATAKE_IDENTIFIER").getInfo()
 
-    ndci_mean_stats = ndci.updateMask(water_mask).reduceRegion(
-        reducer=ee.Reducer.mean(),
-        geometry=region,
-        scale=10, 
-        maxPixels=1e9
-    ).getInfo()
-    
-    ndci_mean_value = ndci_mean_stats.get('nd')
-
-    result_data = {
-        "coordinates": {"lon": lon, "lat": lat},
-        "ndci_mean": round(ndci_mean_value, 4) if ndci_mean_value else None,
-        "total_water_area_m2": round(total_water_sqm, 2),
-        "polluted_area_m2": round(polluted_water_sqm, 2),
-        "polluted_percentage": round(polluted_percentage, 2),
-        "date_analyzed": image.get('DATATAKE_IDENTIFIER').getInfo(),
-        "calculated_at": datetime.now().isoformat()
-    }
+    result_data = _assemble_result_payload(
+        lon,
+        lat,
+        ndci_mean_value,
+        total_water_sqm,
+        polluted_water_sqm,
+        polluted_percentage,
+        date_analyzed,
+    )
 
     if json_filename:
-        with open(json_filename, 'w', encoding='utf-8') as f:
-            json.dump(result_data, f, ensure_ascii=False, indent=4)
+        _write_result_json(result_data, json_filename)
 
     return result_data
 
