@@ -1,103 +1,115 @@
-from back.model.download_images import build_metadata
-from back.model.download_images import select_image
-from back.model.download_images import build_thumbnail
-import json
-from back.model.download_images import save_metadata
-import back.model.download_images as m
-from fakes import FakeCollection, FakeGeometry, FakeImage
-    
-def test_build_region(monkeypatch):
-    def fake_point(coords):
-        return FakeGeometry(coords)
+from fastapi.testclient import TestClient
+from back.routers import methods
 
-    monkeypatch.setattr(m.ee.Geometry, "Point", fake_point)
+client = TestClient(methods.app)
 
-    region = m.build_region(30.0, 60.0, 5)
 
-    assert isinstance(region, FakeGeometry)
+def build_satellite_stub(response):
+    called = {"count": 0, "args": None}
 
-def test_build_metadata():
-    image = FakeImage()
+    def stub(lon, lat, buffer_km, start_date, end_date):
+        called["count"] += 1
+        called["args"] = (lon, lat, buffer_km, start_date, end_date)
+        return None, None, "fake-url", response
 
-    result = build_metadata(
-        image.getInfo(),
-        lon=30.0,
-        lat=60.0,
-        buffer_km=5,
-        start_date="2025-01-01",
-        end_date="2025-02-01",
-        url="http://test"
+    return called, stub
+
+
+def test_get_satellite_image_returns_metadata(monkeypatch):
+    expected_metadata = {
+        "image_id": "IMG_1",
+        "satellite": "Sentinel-2",
+        "collection": "COPERNICUS/S2_SR_HARMONIZED",
+        "acquisition_date": "2025-08-01",
+        "cloud_percentage": 10,
+        "coordinates_center": {"longitude": 30.27, "latitude": 59.96},
+        "buffer_km": 6.0,
+        "date_range": {"start": "2025-06-01", "end": "2025-08-31"},
+        "thumbnail_url": "http://test",
+        "bands_used": ["B4", "B3", "B2", "B8", "B11"],
+        "created_at": "2025-01-01T00:00:00",
+    }
+
+    called, stub = build_satellite_stub(expected_metadata)
+
+    monkeypatch.setattr(methods, "initialize_ee", lambda: None)
+    monkeypatch.setattr(
+        methods.download_images,
+        "get_satellite_image",
+        stub
     )
 
-    assert result["image_id"] == "TEST_IMAGE_123"
-    assert result["cloud_percentage"] == 10
-
-def test_select_image_ok():
-    collection = FakeCollection()
-    image = select_image(collection)
-
-    assert image is not None
-
-def test_select_image_none():
-    class EmptyImage:
-        def getInfo(self):
-            return None
-
-    class EmptyCollection:
-        def first(self):
-            return EmptyImage()
-
-    assert select_image(EmptyCollection()) is None
-
-def test_build_thumbnail():
-    image = FakeImage()
-    region = "region"
-
-    rgb, url = build_thumbnail(image, region)
-
-    assert url == "http://fake-url/image.png"
-    assert rgb is image
-
-def test_save_metadata(tmp_path):
-    file = tmp_path / "meta.json"
-
-    data = {"a": 1}
-
-    save_metadata(data, str(file))
-
-    assert file.exists()
-
-    with open(file) as f:
-        loaded = json.load(f)
-
-    assert loaded == data
-
-def test_open_in_browser(monkeypatch):
-    called = {}
-
-    def fake_open(url):
-        called["url"] = url
-
-    monkeypatch.setattr(m.webbrowser, "open", fake_open)
-
-    m.open_in_browser("http://test")
-
-    assert called["url"] == "http://test"
-
-def test_get_satellite_image(monkeypatch):
-    monkeypatch.setattr(m, "build_collection", lambda *args, **kwargs: FakeCollection())
-    monkeypatch.setattr(m, "open_in_browser", lambda url: None)
-    monkeypatch.setattr(m, "save_metadata", lambda *args, **kwargs: None)
-    monkeypatch.setattr(m, "build_region", lambda lon, lat, buffer_km: "fake-region")
-
-    rgb, region, url, metadata = m.get_satellite_image(
-        lon=30,
-        lat=60,
-        buffer_km=5,
-        json_filename="test.json",
-        open_browser=True
+    response = client.get(
+        "/methods/get_satellite_image",
+        params={"lat": 59.96, "lon": 30.27},
     )
 
-    assert url == "http://fake-url/image.png"
-    assert metadata["satellite"] == "Sentinel-2"
-    assert rgb is not None
+    assert response.status_code == 200
+    assert response.json() == expected_metadata
+    assert called["args"] == (30.27, 59.96, 6.0, "2025-06-01", "2025-08-31")
+    assert called["count"] == 1
+
+def test_get_satellite_image_defaults(monkeypatch):
+    called, stub = build_satellite_stub({"ok": True})
+
+    monkeypatch.setattr(methods, "initialize_ee", lambda: None)
+    monkeypatch.setattr(methods.download_images, "get_satellite_image", stub)
+
+    response = client.get("/methods/get_satellite_image")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+    assert called["args"] == (
+        30.314997,
+        59.938784,
+        6.0,
+        "2025-06-01",
+        "2025-08-31",
+    )
+
+def test_get_satellite_image_invalid_lat(monkeypatch):
+    called, stub = build_satellite_stub({"ok": True})
+
+    monkeypatch.setattr(methods, "initialize_ee", lambda: None)
+    monkeypatch.setattr(methods.download_images, "get_satellite_image", stub)
+
+    response = client.get(
+        "/methods/get_satellite_image",
+        params={"lat": 100, "lon": 30},
+    )
+
+    assert response.status_code == 422
+    assert called["count"] == 0
+
+def test_get_satellite_image_invalid_lon(monkeypatch):
+    called, stub = build_satellite_stub({"ok": True})
+
+    monkeypatch.setattr(methods, "initialize_ee", lambda: None)
+    monkeypatch.setattr(methods.download_images, "get_satellite_image", stub)
+
+    response = client.get(
+        "/methods/get_satellite_image",
+        params={"lat": 50, "lon": 200},
+    )
+
+    assert response.status_code == 422
+    assert called["count"] == 0
+
+
+def test_get_satellite_image_calls_initialize_ee(monkeypatch):
+    ee_calls = {"n": 0}
+
+    def track_ee():
+        ee_calls["n"] += 1
+
+    called, stub = build_satellite_stub({"ok": True})
+
+    monkeypatch.setattr(methods, "initialize_ee", track_ee)
+    monkeypatch.setattr(methods.download_images, "get_satellite_image", stub)
+
+    response = client.get("/methods/get_satellite_image")
+
+    assert response.status_code == 200
+    assert ee_calls["n"] == 1
+    assert called["count"] == 1
