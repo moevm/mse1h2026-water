@@ -27,6 +27,14 @@ def _s2_harmonized_collection(
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
     )
 
+def _ndci_image(s2_image: ee.Image) -> ee.Image:
+    return s2_image.normalizedDifference(["B5", "B4"])
+
+def _polluted_water_mask(
+    ndci: ee.Image, water_mask: ee.Image, ndci_threshold: float
+) -> ee.Image:
+    return ndci.gt(ndci_threshold).And(water_mask)
+
 def get_eutrophication_stats(
     lon: float, 
     lat: float, 
@@ -44,9 +52,8 @@ def get_eutrophication_stats(
 
     image = collection.first()
     water_mask = get_water_mask_gee(image)
-
-    ndci = image.normalizedDifference(['B5', 'B4'])
-    polluted_mask = ndci.gt(ndci_threshold).And(water_mask)
+    ndci = _ndci_image(image)
+    polluted_mask = _polluted_water_mask(ndci, water_mask, ndci_threshold)
 
     pixel_area = ee.Image.pixelArea()
     water_area_img = water_mask.multiply(pixel_area)
