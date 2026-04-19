@@ -2,7 +2,7 @@ import ee
 import json
 from datetime import datetime
 from typing import Optional, Dict, Any
-from water_utils import get_water_mask_gee
+from model.water_utils import get_water_mask_gee
 
 try:
     from ee_auth import initialize_ee
