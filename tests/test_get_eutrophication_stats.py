@@ -69,3 +69,34 @@ def test_get_eutrophication_stats_default_params(monkeypatch):
         0.1,
     )
 
+def test_get_eutrophication_stats_invalid_latitude(monkeypatch):
+    called, stub = build_eutrophication_stub(None)
+    monkeypatch.setattr(methods, "initialize_ee", lambda: None)
+    monkeypatch.setattr(
+        methods.calculate_ndci, "get_eutrophication_stats", stub
+    )
+
+    response = client.get(
+        "/methods/get_eutrophication_stats",
+        params={"lat": 100, "lon": 30.27},
+    )
+
+    assert response.status_code == 422
+    assert called["count"] == 0
+
+
+def test_get_eutrophication_stats_invalid_longitude(monkeypatch):
+    called, stub = build_eutrophication_stub(None)
+    monkeypatch.setattr(methods, "initialize_ee", lambda: None)
+    monkeypatch.setattr(
+        methods.calculate_ndci, "get_eutrophication_stats", stub
+    )
+
+    response = client.get(
+        "/methods/get_eutrophication_stats",
+        params={"lat": 59.96, "lon": 200},
+    )
+
+    assert response.status_code == 422
+    assert called["count"] == 0
+
