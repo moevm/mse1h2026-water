@@ -2,7 +2,7 @@ import ee
 import json
 from datetime import datetime
 from typing import Optional, Dict, Any
-from model.water_utils import get_water_mask_gee
+from water_utils import get_water_mask_gee
 
 try:
     from ee_auth import initialize_ee
@@ -13,6 +13,20 @@ except ModuleNotFoundError:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
     from ee_auth import initialize_ee
 
+def _study_region_bounds(lon: float, lat: float, buffer_km: float) -> ee.Geometry:
+    point = ee.Geometry.Point([lon, lat])
+    return point.buffer(buffer_km * 1000).bounds()
+
+def _s2_harmonized_collection(
+    region: ee.Geometry, start_date: str, end_date: str
+) -> ee.ImageCollection:
+    return (
+        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        .filterDate(start_date, end_date)
+        .filterBounds(region)
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
+    )
+
 def get_eutrophication_stats(
     lon: float, 
     lat: float, 
@@ -22,14 +36,8 @@ def get_eutrophication_stats(
     ndci_threshold: float = 0.1,
     json_filename: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
-    
-    point = ee.Geometry.Point([lon, lat])
-    region = point.buffer(buffer_km * 1000).bounds()
-
-    collection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
-        .filterDate(start_date, end_date) \
-        .filterBounds(region) \
-        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+    region = _study_region_bounds(lon, lat, buffer_km)
+    collection = _s2_harmonized_collection(region, start_date, end_date)
 
     if collection.size().getInfo() == 0:
         return None
