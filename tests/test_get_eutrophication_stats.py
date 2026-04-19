@@ -100,3 +100,20 @@ def test_get_eutrophication_stats_invalid_longitude(monkeypatch):
     assert response.status_code == 422
     assert called["count"] == 0
 
+def test_get_eutrophication_stats_calls_initialize_ee_once(monkeypatch):
+    ee_calls = {"n": 0}
+
+    def track_ee():
+        ee_calls["n"] += 1
+
+    called, stub = build_eutrophication_stub({"ok": True})
+    monkeypatch.setattr(methods, "initialize_ee", track_ee)
+    monkeypatch.setattr(
+        methods.calculate_ndci, "get_eutrophication_stats", stub
+    )
+
+    response = client.get("/methods/get_eutrophication_stats")
+
+    assert response.status_code == 200
+    assert ee_calls["n"] == 1
+    assert called["count"] == 1
