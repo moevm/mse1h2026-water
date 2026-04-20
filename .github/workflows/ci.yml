@@ -153,7 +153,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Start services
-        run: docker compose up -d --no-build
+        run: docker compose up -d
 
       - name: Backend smoke test
         run: |
