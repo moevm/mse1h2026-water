@@ -8,3 +8,5 @@
 - [Командный созвон №4](https://github.com/moevm/mse1h2026-water/blob/reports/team_sync/Созвон%20№4%20(11.03).md)
 - [Командный созвон №5](https://github.com/moevm/mse1h2026-water/blob/reports/team_sync/Созвон%20№5%20(18.03).md)
 - [Командный созвон №6](https://github.com/moevm/mse1h2026-water/blob/reports/team_sync/Созвон%20№6%20(25.03).md)
+- [Командный созвон №7](https://github.com/moevm/mse1h2026-water/blob/reports/team_sync/Созвон%20№7%20(6.04).md)
+- [Командный созвон №8](https://github.com/moevm/mse1h2026-water/blob/reports/team_sync/Созвон%20№8%20(20.04).md)
