@@ -6,3 +6,5 @@ pytest_cache/
 .idea/
 credentials/
 back/img/
+.coverage
+htmlcov/
