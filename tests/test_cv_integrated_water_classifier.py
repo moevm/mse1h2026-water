@@ -7,9 +7,9 @@ client = TestClient(methods.app)
 def build_cv_stub(response):
     called = {"count": 0, "args": None}
 
-    async def stub(image, region, url):
+    async def stub(image, region, url, metadata):
         called["count"] += 1
-        called["args"] = (image, region, url)
+        called["args"] = (image, region, url, metadata)
         return response
 
     return called, stub
@@ -18,9 +18,9 @@ def build_cv_stub(response):
 def build_download_stub():
     called = {"count": 0, "args": None}
 
-    def stub(lon, lat, buffer_km, start_date, end_date, thumbnail_url):
+    def stub(lon, lat, buffer_km, start_date, end_date):
         called["count"] += 1
-        called["args"] = (lon, lat, buffer_km, start_date, end_date, thumbnail_url)
+        called["args"] = (lon, lat, buffer_km, start_date, end_date)
 
         return "fake-image", "fake-region", "fake-url", {}
 
@@ -29,7 +29,6 @@ def build_download_stub():
 
 def test_cv_classifier_success(monkeypatch):
     expected = {
-        "results": [{"id": 1, "type": "река"}],
         "image_path": "img/test.png",
         "geojson_path": "geojson/test.geojson"
     }
@@ -64,9 +63,6 @@ def test_cv_classifier_success(monkeypatch):
     assert response.status_code == 200
 
     data = response.json()
-
-    assert "results" in data
-    assert data["results"][0]["type"] == "река"
 
     assert data["image_path"].startswith("http://testserver/")
     assert data["geojson_path"].startswith("http://testserver/")
@@ -103,7 +99,7 @@ def test_cv_classifier_calls_download_correct(monkeypatch):
 
     client.post("/methods/cv_integrated_water_classifier", json=payload)
 
-    assert dl_called["args"] == (10, 20, 5, "A", "B", "url")
+    assert dl_called["args"] == (10, 20, 5, "A", "B")
 
 
 def test_cv_classifier_invalid_payload():
