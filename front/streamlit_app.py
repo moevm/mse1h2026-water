@@ -85,7 +85,9 @@ def reset_coords() -> None:
     st.session_state["map_lon"] = 30.3351
     st.session_state["map_zoom"] = 10
     st.session_state["map_style_label"] = "Спутник"
-    st.session_state["api_error"] = "" 
+    st.session_state["api_error"] = ""
+    st.session_state["geojson_data"] = None
+    st.session_state["geojson_coords"] = None 
 
 def update_map_from_input() -> None:
     """Обновляет карту при изменении координат в полях ввода"""
@@ -162,23 +164,79 @@ def get_water_info_from_backend(coords: Coords) -> Optional[Dict[str, Any]]:
         return None
     
 def format_result_from_backend(api_response: Dict[str, Any], coords: Coords) -> str:
-    url = api_response.get("annotated_url")
-    results = api_response.get("results")[:2]
+    image_path = api_response.get("image_path")
+    geojson_path = api_response.get("geojson_path")
     ecological_status = api_response.get("eutrophication_stats")
     
     return (
-        f"Ссылка: {url}\n\n"
-        f"Результаты (первые 2 элемента):\n\n"
-        f"```json\n{json.dumps(results, indent=4, ensure_ascii=False)}\n```\n\n"
+        f"Изображение: {image_path}\n\n"
+        f"GeoJSON: {geojson_path}\n\n"
         f"Экологический статус:\n\n"
         f"```json\n{json.dumps(ecological_status, indent=4, ensure_ascii=False)}\n```\n\n"
         f"Координаты: {coords.lat:.6f}, {coords.lon:.6f}"
     )
 
+def get_geojson_bounds(geojson):
+    """Вычисляет границы GeoJSON и возвращает центр и масштаб"""
+    min_lat, max_lat = 90, -90
+    min_lon, max_lon = 180, -180
+    
+    for feature in geojson.get("features", []):
+        geom = feature.get("geometry", {})
+        if geom.get("type") == "Polygon":
+            for coord in geom["coordinates"][0]:
+                lon, lat = coord
+                min_lat = min(min_lat, lat)
+                max_lat = max(max_lat, lat)
+                min_lon = min(min_lon, lon)
+                max_lon = max(max_lon, lon)
+        elif geom.get("type") == "MultiPolygon":
+            for polygon in geom["coordinates"]:
+                for coord in polygon[0]:
+                    lon, lat = coord
+                    min_lat = min(min_lat, lat)
+                    max_lat = max(max_lat, lat)
+                    min_lon = min(min_lon, lon)
+                    max_lon = max(max_lon, lon)
+    
+    # Вычисляем центр и масштаб
+    center_lat = (min_lat + max_lat) / 2
+    center_lon = (min_lon + max_lon) / 2
+    
+    # Приблизительный расчёт масштаба по размеру области
+    lat_diff = max_lat - min_lat
+    zoom = 10
+    if lat_diff < 0.01:
+        zoom = 15
+    elif lat_diff < 0.05:
+        zoom = 13
+    elif lat_diff < 0.1:
+        zoom = 12
+    elif lat_diff < 0.5:
+        zoom = 11
+    
+    return center_lat, center_lon, zoom
+
+
 def run_analysis(coords: Coords) -> str:
     with st.spinner("Получение данных с сервера..."):
         api_response = get_water_info_from_backend(coords)
     if api_response:
+        geojson_data = api_response.get("geojson_path")
+        geojson_response = requests.get(geojson_data)
+        geojson = geojson_response.json() if geojson_response.status_code == 200 else None
+        
+        # Сохраняем geojson в session state для отображения на основной карте
+        st.session_state["geojson_data"] = geojson
+        st.session_state["geojson_coords"] = coords
+        
+        # Автоматически подбираем масштаб и центр карты по границам GeoJSON
+        if geojson:
+            center_lat, center_lon, zoom = get_geojson_bounds(geojson)
+            st.session_state["map_lat"] = center_lat
+            st.session_state["map_lon"] = center_lon
+            st.session_state["map_zoom"] = zoom
+        
         return format_result_from_backend(api_response, coords)
     else:
         return (
@@ -186,17 +244,41 @@ def run_analysis(coords: Coords) -> str:
         )
 
 
-def build_map_figure(lat: float, lon: float, zoom: int, map_style: str) -> go.Figure:
-    fig = go.Figure(
-        go.Scattermap(
-            lat=[lat],
-            lon=[lon],
-            mode="markers",
-            marker={"size": 16},
-            text=[f"Точка: {lat:.6f}, {lon:.6f}"],
-            hoverinfo="text",
-        )
-    )
+def build_map_figure(lat, lon, zoom, map_style, geojson=None):
+    fig = go.Figure()
+
+    if geojson:
+        features = geojson["features"]
+
+        fig.add_trace(go.Choroplethmap(
+            geojson=geojson,
+            locations=[f["properties"].get("id", i) for i, f in enumerate(features)],
+            z=[1] * len(features),
+            featureidkey="properties.id",
+
+            customdata=[
+                [f["properties"].get("id"), f["properties"].get("area")]
+                for f in features
+            ],
+
+            hovertemplate=(
+                "ID: %{customdata[0]}<br>"
+                "Еще текст: %{customdata[1]}<extra></extra>"
+            ),
+
+            colorscale="Blues",
+            showscale=False
+        ))
+
+    fig.add_trace(go.Scattermap(
+        lat=[lat],
+        lon=[lon],
+        mode="markers",
+        marker={"size": 16},
+        text=[f"Точка: {lat:.6f}, {lon:.6f}"],
+        hoverinfo="text",
+    ))
+
 
     fig.update_layout(
         map={
@@ -234,6 +316,10 @@ if "map_style_label" not in st.session_state:
     st.session_state["map_style_label"] = "Спутник"
 if "api_error" not in st.session_state:
     st.session_state["api_error"] = ""
+if "geojson_data" not in st.session_state:
+    st.session_state["geojson_data"] = None
+if "geojson_coords" not in st.session_state:
+    st.session_state["geojson_coords"] = None
 
 
 st.title("🧭 Анализ по координатам")
@@ -306,11 +392,15 @@ st.selectbox(
 
 selected_map_style = MAP_STYLE_OPTIONS[st.session_state["map_style_label"]]
 
+# Используем сохраненный geojson или None если его нет
+geojson_to_display = st.session_state.get("geojson_data")
+
 fig = build_map_figure(
     lat=st.session_state["map_lat"],
     lon=st.session_state["map_lon"],
     zoom=st.session_state["map_zoom"],
     map_style=selected_map_style,
+    geojson=geojson_to_display,
 )
 
 st.plotly_chart(
