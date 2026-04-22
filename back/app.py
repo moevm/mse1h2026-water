@@ -40,11 +40,11 @@ async def get_water_info(
     
     methods.initialize_ee()
     
-    image, region, url, _ = methods.download_images.get_satellite_image(
+    image, region, url, metadata = methods.download_images.get_satellite_image(
         lon, lat, buffer_km, start_date, end_date
     )
     
-    result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
+    result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url, metadata)
     result["image_path"] = f"{request.base_url}{result['image_path']}"
     result["geojson_path"] = f"{request.base_url}{result['geojson_path']}"
     result["eutrophication_stats"] = calculate_ndci.get_eutrophication_stats(lon, lat, buffer_km, start_date, end_date)

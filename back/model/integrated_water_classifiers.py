@@ -134,7 +134,7 @@ def analyze_water_objects(mask, annotated, bounds):
 
     return results
 
-def create_geojson(results, bounds, w_img, h_img):
+def create_geojson(results, bounds, w_img, h_img, metadata):
     features = []
 
     for obj in results:
@@ -153,7 +153,13 @@ def create_geojson(results, bounds, w_img, h_img):
             "type": "Feature",
             "properties": {
                 "id": obj["id"],
-                "type": obj["type"]
+                "type": obj["type"],
+                "area_pixels": obj["area_pixels"],
+                "elongation": obj["elongation"],
+                "center_x": obj["center_x"],
+                "center_y": obj["center_y"],
+                "lon": obj["lon"],
+                "lat": obj["lat"],
             },
             "geometry": {
                 "type": "Polygon",
@@ -163,11 +169,12 @@ def create_geojson(results, bounds, w_img, h_img):
 
     return {
         "type": "FeatureCollection",
-        "features": features
+        "features": features,
+        "metadata": metadata
     }
 
 
-async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, save_image=True, save_geojson=True):
+async def cv_integrated_water_classifier(image_data, region, image_source, metadata, save_image=True, save_geojson=True, do_show_content=False):
 
     """
     Классификация водоемов через OpenCV по данным с ИК-каналами (GEE).
@@ -184,7 +191,7 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
 
     results = analyze_water_objects(mask, annotated, bounds)
 
-    answer = {"results": results}
+    answer = dict()
 
     if save_image:
         os.makedirs("img", exist_ok=True)
@@ -194,7 +201,7 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
 
     if save_geojson:
         os.makedirs("geojson", exist_ok=True)
-        geojson = create_geojson(results, bounds, *annotated.shape[:2][::-1])
+        geojson = create_geojson(results, bounds, *annotated.shape[:2][::-1], metadata)
 
         filename = f"geojson/{uuid.uuid4()}.geojson"
         with open(filename, "w", encoding="utf-8") as f:
@@ -202,4 +209,8 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
 
         answer["geojson_path"] = filename
 
+    if do_show_content:
+        answer["results"] = results
+        answer["metadata"] = metadata
+    
     return answer

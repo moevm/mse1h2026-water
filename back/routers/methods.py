@@ -51,7 +51,7 @@ async def cv_integrated_water_classifier(
     
     image_metadata = image_metadata_json.model_dump()
     
-    image, region, url, _ = download_images.get_satellite_image(
+    image, region, url, metadata = download_images.get_satellite_image(
         lon=image_metadata["coordinates_center"]["longitude"],
         lat=image_metadata["coordinates_center"]["latitude"],
         buffer_km=image_metadata["buffer_km"],
@@ -60,7 +60,7 @@ async def cv_integrated_water_classifier(
         thumbnail_url=image_metadata["thumbnail_url"], 
     )
     
-    result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
+    result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url, metadata)
     result["image_path"] = f"{request.base_url}{result['image_path']}"
     result["geojson_path"] = f"{request.base_url}{result['geojson_path']}"
     return result
