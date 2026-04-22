@@ -136,24 +136,3 @@ def get_eutrophication_stats(
         _write_result_json(result_data, json_filename)
 
     return result_data
-
-if __name__ == "__main__":
-    initialize_ee()
-
-    lon, lat = 30.4677, 59.9226
-    buffer_km = 0.5
-    start_date = '2025-07-15'
-    end_date = '2025-09-10'
-    ndci_threshold = 0.1
-
-    result = get_eutrophication_stats(
-        lon=lon, lat=lat, buffer_km=buffer_km, 
-        start_date=start_date, end_date=end_date, 
-        ndci_threshold=ndci_threshold,
-        json_filename='eutrophication_stats.json'
-    )
-
-    if result:
-        print(f"Средний индекс хлорофилла (NDCI): {result['ndci_mean']}")
-        print(f"Доля эвтрофикации: {result['polluted_percentage']}%")
-        print(f"Общая площадь воды: {result['total_water_area_m2']} кв.м.")

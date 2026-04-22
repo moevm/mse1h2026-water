@@ -203,12 +203,3 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
         answer["geojson_path"] = filename
 
     return answer
-
-if __name__ == "__main__":
-
-    lon, lat = 30.3141, 59.9386  
-
-    image, region, url, metadata = get_satellite_image(lon, lat, buffer_km=6)
-
-    cv_results = cv_integrated_water_classifier(image, region, url, file_to_save="cv_water_objects.png")
-    print(cv_results)

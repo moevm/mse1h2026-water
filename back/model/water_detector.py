@@ -111,14 +111,3 @@ def get_water_type_from_open_data(lat: float, lon: float, radius: int = 50) -> d
                 time.sleep(2)
 
     return result
-
-
-if __name__ == "__main__":
-    test_lat, test_lon = 59.965872971523886, 30.277092720124525  # Координаты в СПб (река Малая Невка)
-    info = get_water_type_from_open_data(test_lat, test_lon, radius=50)
-
-    if "error" in info:
-        print(f"{info['error']}")
-
-    print(f"Определенный тип водоема: {info['water_type']}")
-    print(f"Название водоема: {info['water_name']}")

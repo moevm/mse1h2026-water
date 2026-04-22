@@ -98,17 +98,3 @@ def get_satellite_image(
         open_in_browser(url)
 
     return rgb, region, url, metadata
-
-if __name__ == "__main__":
-    lon, lat = 30.3141, 59.9386
-    buffer_km = 6
-    start_date, end_date = '2025-06-01', '2025-08-31'
-    
-    initialize_ee()
-    
-    image, region, url, metadata = get_satellite_image(
-        lon=lon, lat=lat, buffer_km=buffer_km, 
-        start_date=start_date, end_date=end_date,
-        json_filename='image_info.json',
-        open_browser=True
-    )
