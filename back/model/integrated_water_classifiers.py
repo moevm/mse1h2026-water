@@ -127,7 +127,7 @@ def analyze_water_objects(mask, annotated, bounds):
             "center_y": cy,
             "lon": lon,
             "lat": lat,
-            "contour": cnt
+            "contour": cnt.reshape(-1, 2).tolist()
         })
 
         obj_id += 1
@@ -142,7 +142,7 @@ def create_geojson(results, bounds, w_img, h_img):
         coords = []
 
         for point in cnt:
-            x, y = point[0]
+            x, y = point
             lon, lat = pixel_to_geo(x, y, bounds, w_img, h_img)
             coords.append([lon, lat])
 

@@ -30,7 +30,7 @@ def build_download_stub():
 def test_cv_classifier_success(monkeypatch):
     expected = {
         "results": [{"id": 1, "type": "река"}],
-        "annotated_url": "img/test.png",
+        "image_path": "img/test.png",
         "geojson_path": "geojson/test.geojson"
     }
 
@@ -68,7 +68,7 @@ def test_cv_classifier_success(monkeypatch):
     assert "results" in data
     assert data["results"][0]["type"] == "река"
 
-    assert data["annotated_url"].startswith("http://testserver/")
+    assert data["image_path"].startswith("http://testserver/")
     assert data["geojson_path"].startswith("http://testserver/")
 
     assert cv_called["count"] == 1
@@ -76,7 +76,7 @@ def test_cv_classifier_success(monkeypatch):
 
 
 def test_cv_classifier_calls_download_correct(monkeypatch):
-    cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a", "geojson_path": "b"})
+    cv_called, cv_stub = build_cv_stub({"results": [], "image_path": "a", "geojson_path": "b"})
     dl_called, dl_stub = build_download_stub()
 
     monkeypatch.setattr(methods, "initialize_ee", lambda: None)
@@ -118,7 +118,7 @@ def test_cv_classifier_calls_initialize_ee(monkeypatch):
     def track():
         ee_calls["n"] += 1
 
-    cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a", "geojson_path": "b"})
+    cv_called, cv_stub = build_cv_stub({"results": [], "image_path": "a", "geojson_path": "b"})
     dl_called, dl_stub = build_download_stub()
 
     monkeypatch.setattr(methods, "initialize_ee", track)
