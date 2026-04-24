@@ -196,37 +196,83 @@ def run_analysis(coords: Coords) -> str:
         )
 
 
-def build_map_figure(lat, lon, zoom, map_style, geojson=None):
+def get_color_by_type(feature_type: str) -> str:
+    """Возвращает цвет в зависимости от типа"""
+    type_color_map = {
+        "пруд": "#ffff00",
+        "река": "#00ff00",
+        "болото": "#ff0000",
+        "озеро": "#0000ff",
+    }
+    return type_color_map.get(str(feature_type).lower(), "#0066cc")
+
+
+def build_map_figure(lat, lon, zoom, map_style, geojson=None, polygon_alpha: float = 0.6, point_color: str = "#800080"):
     fig = go.Figure()
 
     if geojson:
         features = geojson["features"]
+        
+        # Группируем объекты по типам и добавляем отдельный trace для каждого типа
+        types = {}
+        for f in features:
+            feature_type = f["properties"].get("type", "unknown")
+            if feature_type not in types:
+                types[feature_type] = []
+            types[feature_type].append(f)
+        
+        for feature_type, type_features in types.items():
+            color = get_color_by_type(feature_type)
 
-        fig.add_trace(go.Choroplethmap(
-            geojson=geojson,
-            locations=[f["properties"].get("id", i) for i, f in enumerate(features)],
-            z=[1] * len(features),
-            featureidkey="properties.id",
+            # Convert hex color to rgba string with requested alpha
+            def hex_to_rgba(hex_color: str, alpha: float) -> str:
+                hex_color = hex_color.lstrip("#")
+                if len(hex_color) == 3:
+                    hex_color = "".join([c*2 for c in hex_color])
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16)
+                b = int(hex_color[4:6], 16)
+                return f"rgba({r}, {g}, {b}, {alpha})"
 
-            customdata=[
-                [f["properties"].get("id"), f["properties"].get("area")]
-                for f in features
-            ],
+            rgba = hex_to_rgba(color, max(0.0, min(1.0, polygon_alpha)))
 
-            hovertemplate=(
-                "ID: %{customdata[0]}<br>"
-                "Еще текст: %{customdata[1]}<extra></extra>"
-            ),
+            fig.add_trace(go.Choroplethmap(
+                geojson={"type": "FeatureCollection", "features": type_features},
+                locations=[f["properties"].get("id", i) for i, f in enumerate(type_features)],
+                z=[1] * len(type_features),
+                featureidkey="properties.id",
+                name=feature_type,
 
-            colorscale="Blues",
-            showscale=False
-        ))
+                customdata=[
+                    [
+                        f["properties"].get("id"),
+                        f["properties"].get("area_pixels"),
+                        f["properties"].get("elongation"),
+                        f["properties"].get("lon"),
+                        f["properties"].get("lat"),
+                    ]
+                    for f in type_features
+                ],
+
+                hovertemplate=(
+                    "ID: %{customdata[0]}<br>"
+                    # "Тип: %{customdata[1]}<br>"
+                    "Площадь (пиксели): %{customdata[1]}<br>"
+                    "Элонгация: %{customdata[2]}<br>"
+                    "Координаты: %{customdata[3]:.6f}, %{customdata[4]:.6f}<br>"
+                ),
+
+                colorscale=[[0, rgba], [1, rgba]],
+                zmin=0,
+                zmax=1,
+                showscale=False,
+            ))
 
     fig.add_trace(go.Scattermap(
         lat=[lat],
         lon=[lon],
         mode="markers",
-        marker={"size": 16},
+        marker={"size": 16, "color": point_color},
         text=[f"Точка: {lat:.6f}, {lon:.6f}"],
         hoverinfo="text",
     ))
@@ -331,7 +377,6 @@ if st.session_state.get("api_error"):
 
 if st.session_state["result_text"]:
     st.success("Анализ выполнен!")
-    st.markdown(st.session_state["result_text"])
 
 st.markdown("---")
 st.subheader("🗺️ Карта")
@@ -363,3 +408,6 @@ st.plotly_chart(
         "displayModeBar": False,
     },
 )
+
+if st.session_state["result_text"]:
+    st.markdown(st.session_state["result_text"])
