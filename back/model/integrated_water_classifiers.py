@@ -170,7 +170,9 @@ def create_geojson(results, bounds, w_img, h_img, metadata):
     return {
         "type": "FeatureCollection",
         "features": features,
-        "metadata": metadata
+        "metadata": metadata,
+        "bounds": bounds,
+        "image_dimensions": [w_img, h_img]
     }
 
 
