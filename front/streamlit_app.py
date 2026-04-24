@@ -176,47 +176,6 @@ def format_result_from_backend(api_response: Dict[str, Any], coords: Coords) -> 
         f"Координаты: {coords.lat:.6f}, {coords.lon:.6f}"
     )
 
-def get_geojson_bounds(geojson):
-    """Вычисляет границы GeoJSON и возвращает центр и масштаб"""
-    min_lat, max_lat = 90, -90
-    min_lon, max_lon = 180, -180
-    
-    for feature in geojson.get("features", []):
-        geom = feature.get("geometry", {})
-        if geom.get("type") == "Polygon":
-            for coord in geom["coordinates"][0]:
-                lon, lat = coord
-                min_lat = min(min_lat, lat)
-                max_lat = max(max_lat, lat)
-                min_lon = min(min_lon, lon)
-                max_lon = max(max_lon, lon)
-        elif geom.get("type") == "MultiPolygon":
-            for polygon in geom["coordinates"]:
-                for coord in polygon[0]:
-                    lon, lat = coord
-                    min_lat = min(min_lat, lat)
-                    max_lat = max(max_lat, lat)
-                    min_lon = min(min_lon, lon)
-                    max_lon = max(max_lon, lon)
-    
-    # Вычисляем центр и масштаб
-    center_lat = (min_lat + max_lat) / 2
-    center_lon = (min_lon + max_lon) / 2
-    
-    # Приблизительный расчёт масштаба по размеру области
-    lat_diff = max_lat - min_lat
-    zoom = 10
-    if lat_diff < 0.01:
-        zoom = 15
-    elif lat_diff < 0.05:
-        zoom = 13
-    elif lat_diff < 0.1:
-        zoom = 12
-    elif lat_diff < 0.5:
-        zoom = 11
-    
-    return center_lat, center_lon, zoom
-
 
 def run_analysis(coords: Coords) -> str:
     with st.spinner("Получение данных с сервера..."):
@@ -229,13 +188,6 @@ def run_analysis(coords: Coords) -> str:
         # Сохраняем geojson в session state для отображения на основной карте
         st.session_state["geojson_data"] = geojson
         st.session_state["geojson_coords"] = coords
-        
-        # Автоматически подбираем масштаб и центр карты по границам GeoJSON
-        if geojson:
-            center_lat, center_lon, zoom = get_geojson_bounds(geojson)
-            st.session_state["map_lat"] = center_lat
-            st.session_state["map_lon"] = center_lon
-            st.session_state["map_zoom"] = zoom
         
         return format_result_from_backend(api_response, coords)
     else:
