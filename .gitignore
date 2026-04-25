@@ -9,4 +9,3 @@ back/img/
 .coverage
 htmlcov/
 back/geojson/
-*.tif

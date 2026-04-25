@@ -8,7 +8,6 @@ import requests
 import os
 import uuid
 import json
-import rasterio
 
 
 def load_image(image_source=None, image_data=None, region=None):
@@ -24,7 +23,7 @@ def load_image(image_source=None, image_data=None, region=None):
     else:
         thumb_url = image_data.getThumbURL({
             'region': region,
-            'dimensions': 512,
+            'dimensions': 1024,
             'format': 'png',
             'min': 0,
             'max': 3000
@@ -43,7 +42,7 @@ def get_water_mask(image_data, region, get_water_mask_gee):
 
     mask_url = mask_gee.getThumbURL({
         'region': region,
-        'dimensions': 512,
+        'dimensions': 1024,
         'format': 'png',
         'min': 0,
         'max': 1
@@ -72,13 +71,16 @@ def classify_water_object(area, elongation, water_ratio):
     else:
         return "болото"
 
-def pixel_to_geo(x, y, transform):
-    
-    lon, lat = rasterio.transform.xy(transform, y, x)
+def pixel_to_geo(x, y, bounds, w_img, h_img):
+    min_lon, min_lat = bounds[0]
+    max_lon, max_lat = bounds[2]
+
+    lon = min_lon + (x / w_img) * (max_lon - min_lon)
+    lat = max_lat - (y / h_img) * (max_lat - min_lat)
 
     return lon, lat
 
-def analyze_water_objects(mask, annotated, tif_file):
+def analyze_water_objects(mask, annotated, bounds):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     results = []
@@ -92,9 +94,6 @@ def analyze_water_objects(mask, annotated, tif_file):
     }
 
     obj_id = 1
-
-    with rasterio.open(tif_file) as src:
-        transform = src.transform
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
@@ -114,8 +113,8 @@ def analyze_water_objects(mask, annotated, tif_file):
         M = cv2.moments(cnt)
         cx = int(M["m10"] / M["m00"]) if M["m00"] else x
         cy = int(M["m01"] / M["m00"]) if M["m00"] else y
-    
-        lon, lat = pixel_to_geo(cx, cy, transform)
+
+        lon, lat = pixel_to_geo(cx, cy, bounds, w_img, h_img)
 
         cv2.drawContours(annotated, [cnt], -1, colors[water_type], 2)
 
@@ -137,18 +136,14 @@ def analyze_water_objects(mask, annotated, tif_file):
 
 def create_geojson(results, bounds, w_img, h_img, metadata):
     features = []
-    
-    tif_file = metadata["tif_file"]
-    with rasterio.open(tif_file) as src:
-        transform = src.transform
-    
+
     for obj in results:
         cnt = obj["contour"]
         coords = []
 
         for point in cnt:
             x, y = point
-            lon, lat = pixel_to_geo(x, y, transform)
+            lon, lat = pixel_to_geo(x, y, bounds, w_img, h_img)
             coords.append([lon, lat])
 
         if coords[0] != coords[-1]:
@@ -196,7 +191,7 @@ async def cv_integrated_water_classifier(image_data, region, image_source, metad
 
     bounds = region.bounds().getInfo()['coordinates'][0]
 
-    results = analyze_water_objects(mask, annotated, tif_file=metadata["tif_file"])
+    results = analyze_water_objects(mask, annotated, bounds)
 
     answer = dict()
 

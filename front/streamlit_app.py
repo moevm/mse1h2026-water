@@ -145,7 +145,7 @@ def get_water_info_from_backend(coords: Coords) -> Optional[Dict[str, Any]]:
                 "lat": coords.lat,
                 "lon": coords.lon
             },
-            timeout=90  
+            timeout=60  
         )
         response.raise_for_status()
         return response.json()
