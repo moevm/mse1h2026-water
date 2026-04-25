@@ -135,8 +135,8 @@ jobs:
       - name: Build backend (cached)
         uses: docker/build-push-action@v5
         with:
-          context: back
-          file: Dockerfile
+          context: .
+          file: back/Dockerfile
           push: false
           load: true
           tags: water-backend:latest
@@ -146,8 +146,8 @@ jobs:
       - name: Build frontend (cached)
         uses: docker/build-push-action@v5
         with:
-          context: front
-          file: Dockerfile
+          context: .
+          file: front/Dockerfile
           push: false
           load: true
           tags: water-frontend:latest
