@@ -59,5 +59,4 @@ app.mount("/img/classified", StaticFiles(directory="img/classified"), name="Кл
 app.mount("/geojson", StaticFiles(directory="geojson"), name="GeoJSON файлы")
 
 if __name__ == "__main__":
-    # Если нужно резко прерывать, то можно добавить timeout_graceful_shutdown=1
     uvicorn.run(f"{filename}:app", reload=True)
