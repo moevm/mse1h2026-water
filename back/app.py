@@ -58,5 +58,6 @@ os.makedirs("geojson", exist_ok=True)
 app.mount("/img/classified", StaticFiles(directory="img/classified"), name="Классифицированные изображения")
 app.mount("/geojson", StaticFiles(directory="geojson"), name="GeoJSON файлы")
 
+
 if __name__ == "__main__":
     uvicorn.run(f"{filename}:app", reload=True)

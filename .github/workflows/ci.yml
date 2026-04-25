@@ -140,8 +140,10 @@ jobs:
           push: false
           load: true
           tags: water-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+          build-args: |
+            BUILDKIT_PROGRESS=plain
 
       - name: Build frontend (cached)
         uses: docker/build-push-action@v5
@@ -151,8 +153,10 @@ jobs:
           push: false
           load: true
           tags: water-frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+          build-args: |
+            BUILDKIT_PROGRESS=plain
 
       - name: Start services
         run: docker compose up -d
