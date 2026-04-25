@@ -10,23 +10,9 @@ import uuid
 import json
 
 
-async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, file_to_save=None, is_create_file_with_url=True, is_create_geojson=True):
-
-    """
-    Классификация водоемов через OpenCV по данным с ИК-каналами (GEE).
-    Для классификации требуется image_data и region.
-    image_source используется только для получения визуального изображения для разметки.
-    """
-
-    # =========================
-    # Получение изображения
-    # =========================
-
-    if image_data is None or region is None:
-        raise ValueError("Для классификации требуются image_data и region с ИК-каналами")
-
+def load_image(image_source=None, image_data=None, region=None):
     if image_source:
-        if image_source.startswith("http://") or image_source.startswith("https://"):
+        if image_source.startswith("http"):
             resp = requests.get(image_source)
             arr = np.frombuffer(resp.content, np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -34,10 +20,6 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
             if not os.path.exists(image_source):
                 raise ValueError("Файл не найден")
             img = cv2.imread(image_source)
-
-        if img is None:
-            raise ValueError("Не удалось загрузить изображение")
-
     else:
         thumb_url = image_data.getThumbURL({
             'region': region,
@@ -50,13 +32,15 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
         arr = np.frombuffer(resp.content, np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
-    annotated = img.copy()
+    if img is None:
+        raise ValueError("Не удалось загрузить изображение")
 
+    return img
 
-    #if image_data is not None:
-    water_mask_gee = get_water_mask_gee(image_data)
+def get_water_mask(image_data, region, get_water_mask_gee):
+    mask_gee = get_water_mask_gee(image_data)
 
-    mask_thumb_url = water_mask_gee.getThumbURL({
+    mask_url = mask_gee.getThumbURL({
         'region': region,
         'dimensions': 1024,
         'format': 'png',
@@ -64,34 +48,52 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
         'max': 1
     })
 
-    resp = requests.get(mask_thumb_url)
+    resp = requests.get(mask_url)
     arr = np.frombuffer(resp.content, np.uint8)
-    water_mask = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+    mask = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
 
-    if water_mask is None:
+    if mask is None:
         raise ValueError("Не удалось загрузить водную маску")
 
-    water_mask = (water_mask > 127).astype(np.uint8) * 255
-
+    mask = (mask > 127).astype(np.uint8) * 255
     kernel = np.ones((2, 2), np.uint8)
-    water_mask = cv2.morphologyEx(water_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-    contours, _ = cv2.findContours(water_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    results = []
-    obj_id = 1
-    h_img, w_img = annotated.shape[:2]
+    return mask
 
-    color_dict = {
-        "пруд": (0, 255, 255),   
-        "река": (0, 255, 0),      
-        "болото": (0, 0, 255),   
-        "озеро": (255, 0, 0)    
-    }
+def classify_water_object(area, elongation, water_ratio):
+    if area < 100:
+        return "пруд"
+    elif elongation > 2 or water_ratio < 0.4:
+        return "река"
+    elif area > 2000:
+        return "озеро"
+    else:
+        return "болото"
 
-    bounds = region.bounds().getInfo()['coordinates'][0]
+def pixel_to_geo(x, y, bounds, w_img, h_img):
     min_lon, min_lat = bounds[0]
     max_lon, max_lat = bounds[2]
+
+    lon = min_lon + (x / w_img) * (max_lon - min_lon)
+    lat = max_lat - (y / h_img) * (max_lat - min_lat)
+
+    return lon, lat
+
+def analyze_water_objects(mask, annotated, bounds):
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    results = []
+    h_img, w_img = annotated.shape[:2]
+
+    colors = {
+        "пруд": (0, 255, 255),
+        "река": (0, 255, 0),
+        "болото": (0, 0, 255),
+        "озеро": (255, 0, 0)
+    }
+
+    obj_id = 1
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
@@ -99,119 +101,108 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
             continue
 
         rect = cv2.minAreaRect(cnt)
-        (cx_r, cy_r), (w, h), angle = rect
+        (_, _), (w, h), _ = rect
         elongation = max(w, h) / (min(w, h) + 1e-6)
 
         x, y, w_box, h_box = cv2.boundingRect(cnt)
-        roi = water_mask[y:y+h_box, x:x+w_box]
+        roi = mask[y:y+h_box, x:x+w_box]
         water_ratio = np.sum(roi > 0) / (w_box * h_box + 1e-6)
 
-        if area < 100:
-            water_type = "пруд"
-        elif elongation > 2 or water_ratio < 0.4: 
-            water_type = "река"
-        elif area > 2000:
-            water_type = "озеро"
-        else:
-            water_type = "болото"
+        water_type = classify_water_object(area, elongation, water_ratio)
 
         M = cv2.moments(cnt)
-        if M["m00"] != 0:
-            cx = int(M["m10"] / M["m00"])
-            cy = int(M["m01"] / M["m00"])
-        else:
-            cx = int(cx_r)
-            cy = int(cy_r)
+        cx = int(M["m10"] / M["m00"]) if M["m00"] else x
+        cy = int(M["m01"] / M["m00"]) if M["m00"] else y
 
-        cv2.drawContours(annotated, [cnt], -1, color_dict[water_type], 2)
+        lon, lat = pixel_to_geo(cx, cy, bounds, w_img, h_img)
 
-        result = {
+        cv2.drawContours(annotated, [cnt], -1, colors[water_type], 2)
+
+        results.append({
             "id": obj_id,
+            "type": water_type,
             "area_pixels": area,
             "elongation": float(elongation),
-            "type": water_type,
             "center_x": cx,
             "center_y": cy,
-            "contour": cnt,
-        }
+            "lon": lon,
+            "lat": lat,
+            "contour": cnt
+        })
 
-        lon = min_lon + (cx / w_img) * (max_lon - min_lon)
-        lat = max_lat - (cy / h_img) * (max_lat - min_lat)
-        result["lon"] = lon
-        result["lat"] = lat
-
-        results.append(result)
         obj_id += 1
 
+    return results
 
-    answer = {'results': results}
-    
-    if file_to_save:
-        cv2.imwrite(file_to_save, annotated)
-        
-    if is_create_file_with_url:
-        unique_filename = f"{uuid.uuid4()}.png"
-        save_path = os.path.join("img/classified", unique_filename)
-        cv2.imwrite(save_path, annotated)
-        annotated_url = f"img/classified/{unique_filename}"
-        answer['annotated_url'] = annotated_url
-    
-    geojson_path = None
-    if is_create_geojson:
-        features = []
-        
-        for result in results:
-            cnt = result.pop("contour")  # Удаляем контур из результата
-            
-            # Преобразуем координаты пикселей в lon/lat
-            coordinates = []
-            for point in cnt:
-                x, y = point[0]
-                if region is not None:
-                    lon = min_lon + (x / w_img) * (max_lon - min_lon)
-                    lat = max_lat - (y / h_img) * (max_lat - min_lat)
-                else:
-                    lon, lat = float(x), float(y)
-                coordinates.append([lon, lat])
-            
-            # Замыкаем полигон
-            if coordinates and coordinates[0] != coordinates[-1]:
-                coordinates.append(coordinates[0])
-            
-            # Создаем GeoJSON feature
-            feature = {
-                "type": "Feature",
-                "properties": {
-                    "id": result["id"],
-                    "type": result["type"],
-                    "area_pixels": result["area_pixels"],
-                    "elongation": result["elongation"]
-                },
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [coordinates]
-                }
+def create_geojson(results, bounds, w_img, h_img):
+    features = []
+
+    for obj in results:
+        cnt = obj["contour"]
+        coords = []
+
+        for point in cnt:
+            x, y = point[0]
+            lon, lat = pixel_to_geo(x, y, bounds, w_img, h_img)
+            coords.append([lon, lat])
+
+        if coords[0] != coords[-1]:
+            coords.append(coords[0])
+
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "id": obj["id"],
+                "type": obj["type"]
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [coords]
             }
-            
-            features.append(feature)
-        
-        # Создаем FeatureCollection
-        geojson_data = {
-            "type": "FeatureCollection",
-            "features": features
-        }
-        
-        # Сохраняем в файл
+        })
+
+    return {
+        "type": "FeatureCollection",
+        "features": features
+    }
+
+
+async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, save_image=True, save_geojson=True):
+
+    """
+    Классификация водоемов через OpenCV по данным с ИК-каналами (GEE).
+    Для классификации требуется image_data и region.
+    image_source используется только для получения визуального изображения для разметки.
+    """
+
+    img = load_image(image_source, image_data, region)
+    annotated = img.copy()
+
+    mask = get_water_mask(image_data, region, get_water_mask_gee)
+
+    bounds = region.bounds().getInfo()['coordinates'][0]
+
+    results = analyze_water_objects(mask, annotated, bounds)
+
+    answer = {"results": results}
+
+    if save_image:
+        os.makedirs("img", exist_ok=True)
+        filename = f"img/{uuid.uuid4()}.png"
+        cv2.imwrite(filename, annotated)
+        answer["image_path"] = filename
+
+    if save_geojson:
         os.makedirs("geojson", exist_ok=True)
-        geojson_filename = f"{uuid.uuid4()}.geojson"
-        geojson_path = os.path.join("geojson", geojson_filename)
-        with open(geojson_path, 'w', encoding='utf-8') as f:
-            json.dump(geojson_data, f, ensure_ascii=False, indent=2)
+        geojson = create_geojson(results, bounds, *annotated.shape[:2][::-1])
 
-        answer['geojson_path'] = "geojson/" + geojson_filename
-        
+        filename = f"geojson/{uuid.uuid4()}.geojson"
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(geojson, f, indent=2, ensure_ascii=False)
+
+        answer["geojson_path"] = filename
+
     return answer
-
 
 if __name__ == "__main__":
 
