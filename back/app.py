@@ -25,7 +25,7 @@ app.add_middleware(
 
 @router.get("/")
 async def redirect_to_docs():
-    return RedirectResponse(url="/docs", status_code=303)
+    return RedirectResponse(url="/docs", status_code=302)
 
 
 @app.get("/water-info")
@@ -55,8 +55,10 @@ app.include_router(router)
 app.include_router(methods.router)
 os.makedirs("img", exist_ok=True)
 os.makedirs("geojson", exist_ok=True)
+os.makedirs("geotif", exist_ok=True)
 app.mount("/img", StaticFiles(directory="img"), name="Классифицированные изображения")
 app.mount("/geojson", StaticFiles(directory="geojson"), name="GeoJSON файлы")
+app.mount("/geotif", StaticFiles(directory="geotif"), name="GEO_TIFF файлы")
 
 if __name__ == "__main__":
     # Если нужно резко прерывать, то можно добавить timeout_graceful_shutdown=1
