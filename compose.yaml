@@ -3,8 +3,8 @@ version: "3.9"
 services:
   backend:
     build:
-      context: back
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: back/Dockerfile
     container_name: water-backend
     ports:
       - "8000:8000"
@@ -19,8 +19,8 @@ services:
 
   frontend:
     build:
-      context: front
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: front/Dockerfile
     container_name: water-frontend
     ports:
       - "8501:8501"

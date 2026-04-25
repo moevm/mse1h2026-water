@@ -23,14 +23,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY back/requirements.txt ./requirements.txt
 
 RUN --mount=type=cache,target=/root/.cache \
     pip install uv && \
     uv pip install --system --upgrade pip && \
     uv pip install --system -r requirements.txt
 
-COPY . .
+COPY back/ ./
 
 RUN mkdir -p /app/credentials /app/output /app/img/classified
 
