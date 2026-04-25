@@ -33,10 +33,11 @@ jobs:
 
       - name: Install deps
         run: |
-          python -m pip install --upgrade pip
-          pip install -r tests/requirements.txt
-          pip install -r back/requirements.txt
-          pip install -r front/requirements.txt
+          pip install uv
+          uv pip install --system --upgrade pip
+          uv pip install --system -r tests/requirements.txt
+          uv pip install --system -r back/requirements.txt
+          uv pip install --system -r front/requirements.txt
 
       - name: Run tests
         run: |
@@ -69,10 +70,11 @@ jobs:
 
       - name: Install deps
         run: |
-          python -m pip install --upgrade pip
-          pip install -r tests/requirements.txt
-          pip install -r back/requirements.txt
-          pip install -r front/requirements.txt
+          pip install uv
+          uv pip install --system --upgrade pip
+          uv pip install --system -r tests/requirements.txt
+          uv pip install --system -r back/requirements.txt
+          uv pip install --system -r front/requirements.txt
 
       - name: Start backend
         run: |
@@ -133,8 +135,8 @@ jobs:
       - name: Build backend (cached)
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: back/Dockerfile
+          context: back
+          file: Dockerfile
           push: false
           load: true
           tags: water-backend:latest
@@ -144,8 +146,8 @@ jobs:
       - name: Build frontend (cached)
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: front/Dockerfile
+          context: front
+          file: Dockerfile
           push: false
           load: true
           tags: water-frontend:latest

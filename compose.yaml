@@ -3,24 +3,24 @@ version: "3.9"
 services:
   backend:
     build:
-      context: .
-      dockerfile: back/Dockerfile
+      context: back
+      dockerfile: Dockerfile
     container_name: water-backend
     ports:
       - "8000:8000"
     env_file:
       - .env
     volumes:
-      - ./back/credentials:/app/credentials:ro
-      - ./back/output:/app/output
-      - ./back/img/classified:/app/img/classified
+      - ./credentials:/app/credentials:ro
+      - ./output:/app/output
+      - ./img/classified:/app/img/classified
     command: ["sh", "-c", "echo 'DOCKER-COMPOSE: Local URL backend: http://localhost:8000' && python -X utf8 -m uvicorn app:app --host=0.0.0.0 --port=8000"]
     restart: unless-stopped
 
   frontend:
     build:
-      context: .
-      dockerfile: front/Dockerfile
+      context: front
+      dockerfile: Dockerfile
     container_name: water-frontend
     ports:
       - "8501:8501"
@@ -28,5 +28,5 @@ services:
       BACKEND_URL: http://backend:8000
     depends_on:
       - backend
-    command: ["sh", "-c", "echo 'DOCKER-COMPOSE: Local URL frontend: http://localhost:8501' && python -X utf8 -m streamlit run front/streamlit_app.py --server.port=8501 --server.address=0.0.0.0"]
+    command: ["sh", "-c", "echo 'DOCKER-COMPOSE: Local URL frontend: http://localhost:8501' && python -X utf8 -m streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0"]
     restart: unless-stopped
