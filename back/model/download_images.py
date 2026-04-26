@@ -40,10 +40,11 @@ def build_thumbnail(image, region):
     rgb = image.select(['B4', 'B3', 'B2', 'B8', 'B11'])
     url = rgb.getThumbURL({
         'region': region,
-        'dimensions': 512,
+        'scale': 30,
         'format': 'png',
         'min': 0,
         'max': 3000,
+        'crs': 'EPSG:3857'
     })
     return rgb, url
 
@@ -72,12 +73,12 @@ def save_metadata(metadata, filename: str):
 def open_in_browser(url: str):
     webbrowser.open(url)
 
-def create_tif_file(image, region, buffer_km):
+def create_tif_file(image, region):
     ee_tif_url = image.getDownloadURL({
         "region": region,
-        "dimensions": "512x512",
+        "scale": 30,
         "format": "GEO_TIFF",
-        "crs": "EPSG:4326",
+        "crs": "EPSG:3857",
     })
     
     r = requests.get(ee_tif_url)
@@ -108,7 +109,7 @@ def get_satellite_image(
     rgb, url = build_thumbnail(image, region)
 
     if not tif_file:
-        tif_file = create_tif_file(image, region, buffer_km)
+        tif_file = create_tif_file(image, region)
     
     info = image.getInfo()
     metadata = build_metadata(

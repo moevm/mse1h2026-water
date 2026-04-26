@@ -1,3 +1,4 @@
+from pyproj import Transformer
 from model.download_images import get_satellite_image
 from model.water_utils import get_water_mask_gee
 
@@ -24,10 +25,11 @@ def load_image(image_source=None, image_data=None, region=None):
     else:
         thumb_url = image_data.getThumbURL({
             'region': region,
-            'dimensions': 512,
+            'scale': 30,
             'format': 'png',
             'min': 0,
-            'max': 3000
+            'max': 3000,
+            'crs': 'EPSG:3857'
         })
         resp = requests.get(thumb_url)
         arr = np.frombuffer(resp.content, np.uint8)
@@ -43,10 +45,11 @@ def get_water_mask(image_data, region, get_water_mask_gee):
 
     mask_url = mask_gee.getThumbURL({
         'region': region,
-        'dimensions': 512,
+        'scale': 30,
         'format': 'png',
         'min': 0,
-        'max': 1
+        'max': 1,
+        'crs': 'EPSG:3857'
     })
 
     resp = requests.get(mask_url)
@@ -72,9 +75,14 @@ def classify_water_object(area, elongation, water_ratio):
     else:
         return "болото"
 
-def pixel_to_geo(x, y, transform):
-    
-    lon, lat = rasterio.transform.xy(transform, y, x)
+def pixel_to_geo(x, y, transform, crs):
+    X, Y = rasterio.transform.xy(transform, y, x)
+
+    if crs.to_string() != "EPSG:4326":
+        transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+        lon, lat = transformer.transform(X, Y)
+    else:
+        lon, lat = X, Y
 
     return lon, lat
 
@@ -95,6 +103,7 @@ def analyze_water_objects(mask, annotated, tif_file):
 
     with rasterio.open(tif_file) as src:
         transform = src.transform
+        crs = src.crs
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
@@ -115,7 +124,7 @@ def analyze_water_objects(mask, annotated, tif_file):
         cx = int(M["m10"] / M["m00"]) if M["m00"] else x
         cy = int(M["m01"] / M["m00"]) if M["m00"] else y
     
-        lon, lat = pixel_to_geo(cx, cy, transform)
+        lon, lat = pixel_to_geo(cx, cy, transform, crs)
 
         cv2.drawContours(annotated, [cnt], -1, colors[water_type], 2)
 
@@ -141,6 +150,7 @@ def create_geojson(results, bounds, w_img, h_img, metadata):
     tif_file = metadata["tif_file"]
     with rasterio.open(tif_file) as src:
         transform = src.transform
+        crs = src.crs
     
     for obj in results:
         cnt = obj["contour"]
@@ -148,7 +158,7 @@ def create_geojson(results, bounds, w_img, h_img, metadata):
 
         for point in cnt:
             x, y = point
-            lon, lat = pixel_to_geo(x, y, transform)
+            lon, lat = pixel_to_geo(x, y, transform, crs)
             coords.append([lon, lat])
 
         if coords[0] != coords[-1]:
