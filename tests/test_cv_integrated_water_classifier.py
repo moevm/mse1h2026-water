@@ -111,6 +111,43 @@ def test_cv_classifier_invalid_payload():
 
     assert response.status_code == 422
 
+def test_cv_classifier_passes_download_result_to_classifier(monkeypatch):
+    cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a", "geojson_path": "b"})
+
+    def dl_stub(lon, lat, buffer_km, start_date, end_date, thumbnail_url):
+        return "image-from-download", "region-from-download", "url-from-download", {}
+
+    monkeypatch.setattr(methods, "initialize_ee", lambda: None)
+    monkeypatch.setattr(methods.download_images, "get_satellite_image", dl_stub)
+    monkeypatch.setattr(
+        methods.integrated_water_classifiers,
+        "cv_integrated_water_classifier",
+        cv_stub
+    )
+
+    payload = {
+        "image_id": "id",
+        "satellite": "Sentinel-2",
+        "collection": "COPERNICUS",
+        "acquisition_date": "2025",
+        "cloud_percentage": 10,
+        "coordinates_center": {"longitude": 30.27, "latitude": 59.96},
+        "buffer_km": 6.0,
+        "date_range": {"start": "2025-06-01", "end": "2025-08-31"},
+        "thumbnail_url": "http://test",
+        "bands_used": [],
+        "created_at": "2025"
+    }
+
+    response = client.post("/methods/cv_integrated_water_classifier", json=payload)
+
+    assert response.status_code == 200
+    assert cv_called["count"] == 1
+    assert cv_called["args"] == (
+        "image-from-download",
+        "region-from-download",
+        "url-from-download",
+    )
 
 def test_cv_classifier_calls_initialize_ee(monkeypatch):
     ee_calls = {"n": 0}
