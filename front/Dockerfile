@@ -16,10 +16,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY front/requirements.txt ./requirements.txt
-RUN python -m pip install --upgrade pip && \
-    python -m pip install -r requirements.txt
 
-COPY front/ ./front/
+RUN --mount=type=cache,target=/root/.cache \
+    pip install uv && \
+    uv pip install --system --upgrade pip && \
+    uv pip install --system -r requirements.txt
+
+COPY front/ ./
 
 # Порт Streamlit
 EXPOSE 8501

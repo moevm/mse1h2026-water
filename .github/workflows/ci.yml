@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache apt
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt
+            /var/lib/apt
+          key: apt-${{ runner.os }}-opencv
+        
+      - name: Install system dependencies (OpenCV fix)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libglib2.0-0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            pip-
+
+      - name: Install deps
+        run: |
+          pip install uv
+          uv pip install --system --upgrade pip
+          uv pip install --system -r tests/requirements.txt
+          uv pip install --system -r back/requirements.txt
+          uv pip install --system -r front/requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest
+
+  native-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache apt
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/cache/apt
+            /var/lib/apt
+          key: apt-${{ runner.os }}-opencv
+
+      - name: Install system dependencies (OpenCV fix)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libglib2.0-0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            pip-
+
+      - name: Install deps
+        run: |
+          pip install uv
+          uv pip install --system --upgrade pip
+          uv pip install --system -r tests/requirements.txt
+          uv pip install --system -r back/requirements.txt
+          uv pip install --system -r front/requirements.txt
+
+      - name: Start backend
+        run: |
+          cd back
+          uvicorn app:app \
+          --host=0.0.0.0 \
+          --port=8000 > backend.log 2>&1 &
+          cd ..
+
+      - name: Start frontend
+        run: |
+          cd front
+          streamlit run streamlit_app.py \
+          --server.port=8501 \
+          --server.headless=true \
+          --server.address=0.0.0.0 > frontend.log 2>&1 &
+          cd ..
+
+      - name: Backend smoke test
+        run: |
+          for i in {1..10}; do
+            if curl -f http://localhost:8000/; then
+              echo "Backend is up!"
+              exit 0
+            else
+              echo "Waiting for backend to be ready..."
+              sleep 3
+            fi
+          done
+          exit 1
+
+      - name: Frontend smoke test
+        run: |  
+          for i in {1..10}; do
+            if curl -f http://localhost:8501/; then
+              echo "Frontend is up!"
+              exit 0
+            else
+              echo "Waiting for frontend to be ready..."
+              sleep 3
+            fi
+          done
+          exit 1
+
+  docker-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: touch .env
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend (cached)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: back/Dockerfile
+          push: false
+          load: true
+          tags: water-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+          build-args: |
+            BUILDKIT_PROGRESS=plain
+
+      - name: Build frontend (cached)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: front/Dockerfile
+          push: false
+          load: true
+          tags: water-frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+          build-args: |
+            BUILDKIT_PROGRESS=plain
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Backend smoke test
+        run: |
+          for i in {1..10}; do
+            if curl -f http://localhost:8000/; then
+              echo "Backend is up!"
+              exit 0
+            else
+              echo "Waiting for backend to be ready..."
+              sleep 3
+            fi
+          done
+          exit 1
+
+      - name: Frontend smoke test
+        run: |
+          for i in {1..10}; do
+            if curl -f http://localhost:8501/; then
+              echo "Frontend is up!"
+              exit 0
+            else
+              echo "Waiting for frontend to be ready..."
+              sleep 3
+            fi
+          done
+          exit 1
+
+      - name: Shutdown
+        if: always()
+        run: docker compose down -v
