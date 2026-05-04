@@ -5,11 +5,12 @@ client = TestClient(methods.app)
 
 
 def build_cv_stub(response):
-    called = {"count": 0, "args": None}
+    called = {"count": 0, "args": None, "kwargs": None}
 
-    async def stub(image, region, url, metadata):
+    async def stub(*args, **kwargs):
         called["count"] += 1
-        called["args"] = (image, region, url, metadata)
+        called["args"] = args
+        called["kwargs"] = kwargs
         return response
 
     return called, stub
@@ -18,7 +19,7 @@ def build_cv_stub(response):
 def build_download_stub():
     called = {"count": 0, "args": None}
 
-    def stub(lon, lat, buffer_km, start_date, end_date):
+    def stub(lon, lat, buffer_km, start_date, end_date, tif_file=None):
         called["count"] += 1
         called["args"] = (lon, lat, buffer_km, start_date, end_date)
 
@@ -108,9 +109,10 @@ def test_cv_classifier_invalid_payload():
     assert response.status_code == 422
 
 def test_cv_classifier_passes_download_result_to_classifier(monkeypatch):
-    cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a", "geojson_path": "b"})
+    cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a",
+                                        "geojson_path": "b", "image_path": "img/test.png"})
 
-    def dl_stub(lon, lat, buffer_km, start_date, end_date, thumbnail_url):
+    def dl_stub(lon, lat, buffer_km, start_date, end_date, tif_file=None):
         return "image-from-download", "region-from-download", "url-from-download", {}
 
     monkeypatch.setattr(methods, "initialize_ee", lambda: None)
@@ -143,12 +145,13 @@ def test_cv_classifier_passes_download_result_to_classifier(monkeypatch):
         "image-from-download",
         "region-from-download",
         "url-from-download",
+        {}
     )
 
 def test_cv_classifier_does_not_call_classifier_when_download_fails(monkeypatch):
     cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a", "geojson_path": "b"})
 
-    def dl_stub(lon, lat, buffer_km, start_date, end_date, thumbnail_url):
+    def dl_stub(lon, lat, buffer_km, start_date, end_date, tif_file=None):
         raise RuntimeError("download failed")
 
     monkeypatch.setattr(methods, "initialize_ee", lambda: None)
@@ -183,13 +186,13 @@ def test_cv_classifier_does_not_call_classifier_when_download_fails(monkeypatch)
 def test_cv_classifier_download_called_before_classifier(monkeypatch):
     order = []
 
-    def dl_stub(lon, lat, buffer_km, start_date, end_date, thumbnail_url):
+    def dl_stub(lon, lat, buffer_km, start_date, end_date, tif_file=None):
         order.append("download")
-        return "image", "region", "url", {}
+        return "image", "region", "url", {"smth":"data"}
 
-    async def cv_stub(image, region, url):
+    async def cv_stub(image, region, url, metadata):
         order.append("classifier")
-        return {"results": [], "annotated_url": "a", "geojson_path": "b"}
+        return {"results": [], "annotated_url": "a", "geojson_path": "b","image_path":"img/test.png"}
 
     monkeypatch.setattr(methods, "initialize_ee", lambda: None)
     monkeypatch.setattr(methods.download_images, "get_satellite_image", dl_stub)
