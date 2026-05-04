@@ -127,7 +127,7 @@ def analyze_water_objects(mask, annotated, bounds):
             "center_y": cy,
             "lon": lon,
             "lat": lat,
-            "contour": cnt
+            "contour": cnt.reshape(-1, 2).tolist()
         })
 
         obj_id += 1
@@ -142,7 +142,7 @@ def create_geojson(results, bounds, w_img, h_img):
         coords = []
 
         for point in cnt:
-            x, y = point[0]
+            x, y = point
             lon, lat = pixel_to_geo(x, y, bounds, w_img, h_img)
             coords.append([lon, lat])
 
@@ -191,6 +191,7 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
         filename = f"img/{uuid.uuid4()}.png"
         cv2.imwrite(filename, annotated)
         answer["image_path"] = filename
+        answer["annotated_url"] = filename
 
     if save_geojson:
         os.makedirs("geojson", exist_ok=True)
