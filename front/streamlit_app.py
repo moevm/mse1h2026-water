@@ -85,7 +85,9 @@ def reset_coords() -> None:
     st.session_state["map_lon"] = 30.3351
     st.session_state["map_zoom"] = 10
     st.session_state["map_style_label"] = "Спутник"
-    st.session_state["api_error"] = "" 
+    st.session_state["api_error"] = ""
+    st.session_state["geojson_data"] = None
+    st.session_state["geojson_coords"] = None 
 
 def update_map_from_input() -> None:
     """Обновляет карту при изменении координат в полях ввода"""
@@ -143,7 +145,7 @@ def get_water_info_from_backend(coords: Coords) -> Optional[Dict[str, Any]]:
                 "lat": coords.lat,
                 "lon": coords.lon
             },
-            timeout=60  
+            timeout=90  
         )
         response.raise_for_status()
         return response.json()
@@ -162,23 +164,31 @@ def get_water_info_from_backend(coords: Coords) -> Optional[Dict[str, Any]]:
         return None
     
 def format_result_from_backend(api_response: Dict[str, Any], coords: Coords) -> str:
-    url = api_response.get("annotated_url")
-    results = api_response.get("results")[:2]
+    image_path = api_response.get("image_path")
+    geojson_path = api_response.get("geojson_path")
     ecological_status = api_response.get("eutrophication_stats")
     
     return (
-        f"Ссылка: {url}\n\n"
-        f"Результаты (первые 2 элемента):\n\n"
-        f"```json\n{json.dumps(results, indent=4, ensure_ascii=False)}\n```\n\n"
+        f"Изображение: {image_path}\n\n"
+        f"GeoJSON: {geojson_path}\n\n"
         f"Экологический статус:\n\n"
         f"```json\n{json.dumps(ecological_status, indent=4, ensure_ascii=False)}\n```\n\n"
         f"Координаты: {coords.lat:.6f}, {coords.lon:.6f}"
     )
 
+
 def run_analysis(coords: Coords) -> str:
     with st.spinner("Получение данных с сервера..."):
         api_response = get_water_info_from_backend(coords)
     if api_response:
+        geojson_data = api_response.get("geojson_path")
+        geojson_response = requests.get(geojson_data)
+        geojson = geojson_response.json() if geojson_response.status_code == 200 else None
+        
+        # Сохраняем geojson в session state для отображения на основной карте
+        st.session_state["geojson_data"] = geojson
+        st.session_state["geojson_coords"] = coords
+        
         return format_result_from_backend(api_response, coords)
     else:
         return (
@@ -186,17 +196,87 @@ def run_analysis(coords: Coords) -> str:
         )
 
 
-def build_map_figure(lat: float, lon: float, zoom: int, map_style: str) -> go.Figure:
-    fig = go.Figure(
-        go.Scattermap(
-            lat=[lat],
-            lon=[lon],
-            mode="markers",
-            marker={"size": 16},
-            text=[f"Точка: {lat:.6f}, {lon:.6f}"],
-            hoverinfo="text",
-        )
-    )
+def get_color_by_type(feature_type: str) -> str:
+    """Возвращает цвет в зависимости от типа"""
+    type_color_map = {
+        "пруд": "#ffff00",
+        "река": "#00ff00",
+        "болото": "#ff0000",
+        "озеро": "#0000ff",
+    }
+    return type_color_map.get(str(feature_type).lower(), "#0066cc")
+
+
+def build_map_figure(lat, lon, zoom, map_style, geojson=None, polygon_alpha: float = 0.6, point_color: str = "#800080"):
+    fig = go.Figure()
+
+    if geojson:
+        features = geojson["features"]
+        
+        # Группируем объекты по типам и добавляем отдельный trace для каждого типа
+        types = {}
+        for f in features:
+            feature_type = f["properties"].get("type", "unknown")
+            if feature_type not in types:
+                types[feature_type] = []
+            types[feature_type].append(f)
+        
+        for feature_type, type_features in types.items():
+            color = get_color_by_type(feature_type)
+
+            # Convert hex color to rgba string with requested alpha
+            def hex_to_rgba(hex_color: str, alpha: float) -> str:
+                hex_color = hex_color.lstrip("#")
+                if len(hex_color) == 3:
+                    hex_color = "".join([c*2 for c in hex_color])
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16)
+                b = int(hex_color[4:6], 16)
+                return f"rgba({r}, {g}, {b}, {alpha})"
+
+            rgba = hex_to_rgba(color, max(0.0, min(1.0, polygon_alpha)))
+
+            fig.add_trace(go.Choroplethmap(
+                geojson={"type": "FeatureCollection", "features": type_features},
+                locations=[f["properties"].get("id", i) for i, f in enumerate(type_features)],
+                z=[1] * len(type_features),
+                featureidkey="properties.id",
+                name=feature_type,
+
+                customdata=[
+                    [
+                        f["properties"].get("id"),
+                        f["properties"].get("area_pixels"),
+                        f["properties"].get("elongation"),
+                        f["properties"].get("lon"),
+                        f["properties"].get("lat"),
+                    ]
+                    for f in type_features
+                ],
+
+                hovertemplate=(
+                    "ID: %{customdata[0]}<br>"
+                    # "Тип: %{customdata[1]}<br>"
+                    "Площадь (пиксели): %{customdata[1]}<br>"
+                    "Элонгация: %{customdata[2]}<br>"
+                    "Координаты: %{customdata[3]:.6f}, %{customdata[4]:.6f}<br>"
+                ),
+
+                colorscale=[[0, rgba], [1, rgba]],
+                zmin=0,
+                zmax=1,
+                showscale=False,
+            ))
+
+    fig.add_trace(go.Scattermap(
+        lat=[lat],
+        lon=[lon],
+        mode="markers",
+        marker={"size": 16, "color": point_color},
+        text=[f"Точка: {lat:.6f}, {lon:.6f}"],
+        hoverinfo="text",
+    ))
+
 
     fig.update_layout(
         map={
@@ -234,6 +314,10 @@ if "map_style_label" not in st.session_state:
     st.session_state["map_style_label"] = "Спутник"
 if "api_error" not in st.session_state:
     st.session_state["api_error"] = ""
+if "geojson_data" not in st.session_state:
+    st.session_state["geojson_data"] = None
+if "geojson_coords" not in st.session_state:
+    st.session_state["geojson_coords"] = None
 
 
 st.title("🧭 Анализ по координатам")
@@ -293,7 +377,6 @@ if st.session_state.get("api_error"):
 
 if st.session_state["result_text"]:
     st.success("Анализ выполнен!")
-    st.markdown(st.session_state["result_text"])
 
 st.markdown("---")
 st.subheader("🗺️ Карта")
@@ -306,11 +389,15 @@ st.selectbox(
 
 selected_map_style = MAP_STYLE_OPTIONS[st.session_state["map_style_label"]]
 
+# Используем сохраненный geojson или None если его нет
+geojson_to_display = st.session_state.get("geojson_data")
+
 fig = build_map_figure(
     lat=st.session_state["map_lat"],
     lon=st.session_state["map_lon"],
     zoom=st.session_state["map_zoom"],
     map_style=selected_map_style,
+    geojson=geojson_to_display,
 )
 
 st.plotly_chart(
@@ -321,3 +408,6 @@ st.plotly_chart(
         "displayModeBar": False,
     },
 )
+
+if st.session_state["result_text"]:
+    st.markdown(st.session_state["result_text"])

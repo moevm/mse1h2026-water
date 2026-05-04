@@ -1,8 +1,12 @@
 import ee
 import json
 import webbrowser
+import requests
+import uuid
 from datetime import datetime
 from typing import Tuple, Optional, Dict, Any
+
+from streamlit import image
 
 try:
     from ee_auth import initialize_ee
@@ -36,16 +40,17 @@ def build_thumbnail(image, region):
     rgb = image.select(['B4', 'B3', 'B2', 'B8', 'B11'])
     url = rgb.getThumbURL({
         'region': region,
-        'dimensions': 1024,
+        'scale': 30,
         'format': 'png',
         'min': 0,
         'max': 3000,
+        'crs': 'EPSG:3857'
     })
     return rgb, url
 
-def build_metadata(image_info, lon, lat, buffer_km, start_date, end_date, url):
+def build_metadata(image_info, lon, lat, buffer_km, start_date, end_date, url, tif_file):
     props = image_info.get('properties', {}) if image_info else {}
-
+    
     return {
         "image_id": image_info.get('id') if image_info else None,
         "satellite": "Sentinel-2",
@@ -57,7 +62,8 @@ def build_metadata(image_info, lon, lat, buffer_km, start_date, end_date, url):
         "date_range": {"start": start_date, "end": end_date},
         "thumbnail_url": url,
         "bands_used": ['B4', 'B3', 'B2', 'B8', 'B11'],
-        "created_at": datetime.now().isoformat()
+        "tif_file": tif_file,
+        "created_at": datetime.now().isoformat(),
     }
 
 def save_metadata(metadata, filename: str):
@@ -67,6 +73,21 @@ def save_metadata(metadata, filename: str):
 def open_in_browser(url: str):
     webbrowser.open(url)
 
+def create_tif_file(image, region):
+    ee_tif_url = image.getDownloadURL({
+        "region": region,
+        "scale": 30,
+        "format": "GEO_TIFF",
+        "crs": "EPSG:3857",
+    })
+    
+    r = requests.get(ee_tif_url)
+    tif_file = f"geotif/{uuid.uuid4()}.tif"
+    with open(tif_file, "xb") as f:
+        f.write(r.content)
+    
+    return tif_file
+
 def get_satellite_image(
     lon: float,
     lat: float,
@@ -75,6 +96,7 @@ def get_satellite_image(
     end_date: str = '2025-08-31',
     json_filename: str | None = None,
     open_browser: bool = False,
+    tif_file: str | None = None
 ):
     region = build_region(lon, lat, buffer_km)
     collection = build_collection(region, start_date, end_date)
@@ -86,9 +108,12 @@ def get_satellite_image(
 
     rgb, url = build_thumbnail(image, region)
 
+    if not tif_file:
+        tif_file = create_tif_file(image, region)
+    
     info = image.getInfo()
     metadata = build_metadata(
-        info, lon, lat, buffer_km, start_date, end_date, url
+        info, lon, lat, buffer_km, start_date, end_date, url, tif_file
     )
 
     if json_filename:
@@ -98,17 +123,3 @@ def get_satellite_image(
         open_in_browser(url)
 
     return rgb, region, url, metadata
-
-if __name__ == "__main__":
-    lon, lat = 30.3141, 59.9386
-    buffer_km = 6
-    start_date, end_date = '2025-06-01', '2025-08-31'
-    
-    initialize_ee()
-    
-    image, region, url, metadata = get_satellite_image(
-        lon=lon, lat=lat, buffer_km=buffer_km, 
-        start_date=start_date, end_date=end_date,
-        json_filename='image_info.json',
-        open_browser=True
-    )

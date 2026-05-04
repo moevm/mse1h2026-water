@@ -15,6 +15,7 @@ filename = os.path.splitext(file)[0]
 app = FastAPI()
 router = APIRouter(prefix=f"/{filename}")
 
+
 class SatelliteImageMetadata(BaseModel):
     image_id: str
     satellite: str
@@ -26,7 +27,10 @@ class SatelliteImageMetadata(BaseModel):
     date_range: Dict[str, str]
     thumbnail_url: str = None
     bands_used: list = None
+    tif_file: str = None
     created_at: str = None
+
+
 @router.get("/get_satellite_image")
 async def get_satellite_image(
     lat: float = Query(default=59.938784, ge=-90, le=90),
@@ -51,17 +55,17 @@ async def cv_integrated_water_classifier(
     
     image_metadata = image_metadata_json.model_dump()
     
-    image, region, url, _ = download_images.get_satellite_image(
+    image, region, url, metadata = download_images.get_satellite_image(
         lon=image_metadata["coordinates_center"]["longitude"],
         lat=image_metadata["coordinates_center"]["latitude"],
         buffer_km=image_metadata["buffer_km"],
         start_date=image_metadata["date_range"]["start"],
-        end_date=image_metadata["date_range"]["end"],
-        thumbnail_url=image_metadata["thumbnail_url"], 
+        end_date=image_metadata["date_range"]["end"], 
+        tif_file=image_metadata["tif_file"]
     )
     
-    result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url)
-    result["annotated_url"] = f"{request.base_url}{result['annotated_url']}"
+    result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url, metadata)
+    result["image_path"] = f"{request.base_url}{result['image_path']}"
     result["geojson_path"] = f"{request.base_url}{result['geojson_path']}"
     return result
 

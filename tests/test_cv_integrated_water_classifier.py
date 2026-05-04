@@ -7,9 +7,9 @@ client = TestClient(methods.app)
 def build_cv_stub(response):
     called = {"count": 0, "args": None}
 
-    async def stub(image, region, url):
+    async def stub(image, region, url, metadata):
         called["count"] += 1
-        called["args"] = (image, region, url)
+        called["args"] = (image, region, url, metadata)
         return response
 
     return called, stub
@@ -18,9 +18,9 @@ def build_cv_stub(response):
 def build_download_stub():
     called = {"count": 0, "args": None}
 
-    def stub(lon, lat, buffer_km, start_date, end_date, thumbnail_url):
+    def stub(lon, lat, buffer_km, start_date, end_date):
         called["count"] += 1
-        called["args"] = (lon, lat, buffer_km, start_date, end_date, thumbnail_url)
+        called["args"] = (lon, lat, buffer_km, start_date, end_date)
 
         return "fake-image", "fake-region", "fake-url", {}
 
@@ -29,8 +29,7 @@ def build_download_stub():
 
 def test_cv_classifier_success(monkeypatch):
     expected = {
-        "results": [{"id": 1, "type": "река"}],
-        "annotated_url": "img/test.png",
+        "image_path": "img/test.png",
         "geojson_path": "geojson/test.geojson"
     }
 
@@ -65,10 +64,7 @@ def test_cv_classifier_success(monkeypatch):
 
     data = response.json()
 
-    assert "results" in data
-    assert data["results"][0]["type"] == "река"
-
-    assert data["annotated_url"].startswith("http://testserver/")
+    assert data["image_path"].startswith("http://testserver/")
     assert data["geojson_path"].startswith("http://testserver/")
 
     assert cv_called["count"] == 1
@@ -76,7 +72,7 @@ def test_cv_classifier_success(monkeypatch):
 
 
 def test_cv_classifier_calls_download_correct(monkeypatch):
-    cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a", "geojson_path": "b"})
+    cv_called, cv_stub = build_cv_stub({"results": [], "image_path": "a", "geojson_path": "b"})
     dl_called, dl_stub = build_download_stub()
 
     monkeypatch.setattr(methods, "initialize_ee", lambda: None)
@@ -103,7 +99,7 @@ def test_cv_classifier_calls_download_correct(monkeypatch):
 
     client.post("/methods/cv_integrated_water_classifier", json=payload)
 
-    assert dl_called["args"] == (10, 20, 5, "A", "B", "url")
+    assert dl_called["args"] == (10, 20, 5, "A", "B")
 
 
 def test_cv_classifier_invalid_payload():
@@ -118,7 +114,7 @@ def test_cv_classifier_calls_initialize_ee(monkeypatch):
     def track():
         ee_calls["n"] += 1
 
-    cv_called, cv_stub = build_cv_stub({"results": [], "annotated_url": "a", "geojson_path": "b"})
+    cv_called, cv_stub = build_cv_stub({"results": [], "image_path": "a", "geojson_path": "b"})
     dl_called, dl_stub = build_download_stub()
 
     monkeypatch.setattr(methods, "initialize_ee", track)

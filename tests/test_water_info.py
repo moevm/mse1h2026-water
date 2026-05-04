@@ -34,7 +34,7 @@ def test_get_water_info_success(monkeypatch):
     fake_url = "http://image.url/thumb.png"
 
     classifier_result = {
-        "annotated_url": "img/classified/test.png",
+        "image_path": "img/classified/test.png",
         "geojson_path": "geojson/test.geojson",
     }
 
@@ -84,11 +84,11 @@ def test_get_water_info_success(monkeypatch):
     assert response.status_code == 200
     data = response.json()
 
-    assert "annotated_url" in data
+    assert "image_path" in data
     assert "geojson_path" in data
     assert "eutrophication_stats" in data
 
-    assert data["annotated_url"].startswith("http")
+    assert data["image_path"].startswith("http")
     assert data["geojson_path"].startswith("http")
 
     assert ee_called["n"] == 1
@@ -103,7 +103,7 @@ def test_get_water_info_default_params(monkeypatch):
     fake_url = "http://image.url/thumb.png"
 
     classifier_result = {
-        "annotated_url": "img/classified/test.png",
+        "image_path": "img/classified/test.png",
         "geojson_path": "geojson/test.geojson",
     }
 

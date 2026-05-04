@@ -1,3 +1,4 @@
+from pyproj import Transformer
 from model.download_images import get_satellite_image
 from model.water_utils import get_water_mask_gee
 
@@ -8,6 +9,7 @@ import requests
 import os
 import uuid
 import json
+import rasterio
 
 
 def load_image(image_source=None, image_data=None, region=None):
@@ -23,10 +25,11 @@ def load_image(image_source=None, image_data=None, region=None):
     else:
         thumb_url = image_data.getThumbURL({
             'region': region,
-            'dimensions': 1024,
+            'scale': 30,
             'format': 'png',
             'min': 0,
-            'max': 3000
+            'max': 3000,
+            'crs': 'EPSG:3857'
         })
         resp = requests.get(thumb_url)
         arr = np.frombuffer(resp.content, np.uint8)
@@ -42,10 +45,11 @@ def get_water_mask(image_data, region, get_water_mask_gee):
 
     mask_url = mask_gee.getThumbURL({
         'region': region,
-        'dimensions': 1024,
+        'scale': 30,
         'format': 'png',
         'min': 0,
-        'max': 1
+        'max': 1,
+        'crs': 'EPSG:3857'
     })
 
     resp = requests.get(mask_url)
@@ -71,16 +75,18 @@ def classify_water_object(area, elongation, water_ratio):
     else:
         return "болото"
 
-def pixel_to_geo(x, y, bounds, w_img, h_img):
-    min_lon, min_lat = bounds[0]
-    max_lon, max_lat = bounds[2]
+def pixel_to_geo(x, y, transform, crs):
+    X, Y = rasterio.transform.xy(transform, y, x)
 
-    lon = min_lon + (x / w_img) * (max_lon - min_lon)
-    lat = max_lat - (y / h_img) * (max_lat - min_lat)
+    if crs.to_string() != "EPSG:4326":
+        transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+        lon, lat = transformer.transform(X, Y)
+    else:
+        lon, lat = X, Y
 
     return lon, lat
 
-def analyze_water_objects(mask, annotated, bounds):
+def analyze_water_objects(mask, annotated, tif_file):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     results = []
@@ -94,6 +100,10 @@ def analyze_water_objects(mask, annotated, bounds):
     }
 
     obj_id = 1
+
+    with rasterio.open(tif_file) as src:
+        transform = src.transform
+        crs = src.crs
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
@@ -113,8 +123,8 @@ def analyze_water_objects(mask, annotated, bounds):
         M = cv2.moments(cnt)
         cx = int(M["m10"] / M["m00"]) if M["m00"] else x
         cy = int(M["m01"] / M["m00"]) if M["m00"] else y
-
-        lon, lat = pixel_to_geo(cx, cy, bounds, w_img, h_img)
+    
+        lon, lat = pixel_to_geo(cx, cy, transform, crs)
 
         cv2.drawContours(annotated, [cnt], -1, colors[water_type], 2)
 
@@ -134,16 +144,21 @@ def analyze_water_objects(mask, annotated, bounds):
 
     return results
 
-def create_geojson(results, bounds, w_img, h_img):
+def create_geojson(results, bounds, w_img, h_img, metadata):
     features = []
-
+    
+    tif_file = metadata["tif_file"]
+    with rasterio.open(tif_file) as src:
+        transform = src.transform
+        crs = src.crs
+    
     for obj in results:
         cnt = obj["contour"]
         coords = []
 
         for point in cnt:
             x, y = point
-            lon, lat = pixel_to_geo(x, y, bounds, w_img, h_img)
+            lon, lat = pixel_to_geo(x, y, transform, crs)
             coords.append([lon, lat])
 
         if coords[0] != coords[-1]:
@@ -153,7 +168,13 @@ def create_geojson(results, bounds, w_img, h_img):
             "type": "Feature",
             "properties": {
                 "id": obj["id"],
-                "type": obj["type"]
+                "type": obj["type"],
+                "area_pixels": obj["area_pixels"],
+                "elongation": obj["elongation"],
+                "center_x": obj["center_x"],
+                "center_y": obj["center_y"],
+                "lon": obj["lon"],
+                "lat": obj["lat"],
             },
             "geometry": {
                 "type": "Polygon",
@@ -163,11 +184,14 @@ def create_geojson(results, bounds, w_img, h_img):
 
     return {
         "type": "FeatureCollection",
-        "features": features
+        "features": features,
+        "metadata": metadata,
+        "bounds": bounds,
+        "image_dimensions": [w_img, h_img]
     }
 
 
-async def cv_integrated_water_classifier(image_data=None, region=None, image_source=None, save_image=True, save_geojson=True):
+async def cv_integrated_water_classifier(image_data, region, image_source, metadata, save_image=True, save_geojson=True, do_show_content=False):
 
     """
     Классификация водоемов через OpenCV по данным с ИК-каналами (GEE).
@@ -182,9 +206,9 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
 
     bounds = region.bounds().getInfo()['coordinates'][0]
 
-    results = analyze_water_objects(mask, annotated, bounds)
+    results = analyze_water_objects(mask, annotated, tif_file=metadata["tif_file"])
 
-    answer = {"results": results}
+    answer = dict()
 
     if save_image:
         os.makedirs("img", exist_ok=True)
@@ -195,7 +219,7 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
 
     if save_geojson:
         os.makedirs("geojson", exist_ok=True)
-        geojson = create_geojson(results, bounds, *annotated.shape[:2][::-1])
+        geojson = create_geojson(results, bounds, *annotated.shape[:2][::-1], metadata)
 
         filename = f"geojson/{uuid.uuid4()}.geojson"
         with open(filename, "w", encoding="utf-8") as f:
@@ -203,13 +227,8 @@ async def cv_integrated_water_classifier(image_data=None, region=None, image_sou
 
         answer["geojson_path"] = filename
 
+    if do_show_content:
+        answer["results"] = results
+        answer["metadata"] = metadata
+    
     return answer
-
-if __name__ == "__main__":
-
-    lon, lat = 30.3141, 59.9386  
-
-    image, region, url, metadata = get_satellite_image(lon, lat, buffer_km=6)
-
-    cv_results = cv_integrated_water_classifier(image, region, url, file_to_save="cv_water_objects.png")
-    print(cv_results)
