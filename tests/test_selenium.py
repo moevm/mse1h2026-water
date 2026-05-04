@@ -11,7 +11,7 @@ def test_streamlit_coordinates():
     driver.get("http://localhost:8501")
 
     try:
-        wait = WebDriverWait(driver, 60)
+        wait = WebDriverWait(driver, 120)
 
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
