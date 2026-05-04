@@ -6,6 +6,9 @@ __pycache__
 *.pyc
 .pytest_cache
 .env
+node_modules
+logs
+*.log
 back/credentials
 back/output
 back/img/classified

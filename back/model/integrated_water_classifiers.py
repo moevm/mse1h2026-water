@@ -215,6 +215,7 @@ async def cv_integrated_water_classifier(image_data, region, image_source, metad
         filename = f"img/{uuid.uuid4()}.png"
         cv2.imwrite(filename, annotated)
         answer["image_path"] = filename
+        answer["annotated_url"] = filename
 
     if save_geojson:
         os.makedirs("geojson", exist_ok=True)

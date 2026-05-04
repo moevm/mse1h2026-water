@@ -53,6 +53,7 @@ async def get_water_info(
 
 app.include_router(router)
 app.include_router(methods.router)
+
 os.makedirs("img", exist_ok=True)
 os.makedirs("geojson", exist_ok=True)
 os.makedirs("geotif", exist_ok=True)
@@ -60,6 +61,6 @@ app.mount("/img", StaticFiles(directory="img"), name="Классифициров
 app.mount("/geojson", StaticFiles(directory="geojson"), name="GeoJSON файлы")
 app.mount("/geotif", StaticFiles(directory="geotif"), name="GEO_TIFF файлы")
 
+
 if __name__ == "__main__":
-    # Если нужно резко прерывать, то можно добавить timeout_graceful_shutdown=1
     uvicorn.run(f"{filename}:app", reload=True)

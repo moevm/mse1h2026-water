@@ -15,7 +15,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_RETRIES=10 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libgl1 \
     libsm6 \
@@ -25,8 +27,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY back/requirements.txt ./requirements.txt
 
-RUN python -m pip install --upgrade pip && \
-    python -m pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache \
+    pip install uv && \
+    uv pip install --system --upgrade pip && \
+    uv pip install --system -r requirements.txt
 
 COPY back/ ./
 
