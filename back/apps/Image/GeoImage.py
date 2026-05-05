@@ -15,7 +15,7 @@ initialize_ee()
 
 class GeoImage:
     def __init__(self, ee_image: ee.Image, region: ee.Geometry, query_data: Dict[str, Any]):
-        self._ee_image = ee_image.select(['B4', 'B3', 'B2', 'B8', 'B11'])
+        self._ee_image = ee_image.select(query_data.get("bands", ['B4', 'B3', 'B2', 'B8', 'B11']))
         self._region = region
         self._info: Optional[Dict[str, Any]] = None
         self._query_data = query_data
@@ -31,6 +31,7 @@ class GeoImage:
         end_date: str = '2025-08-31',
         image_collection: str = 'COPERNICUS/S2_SR_HARMONIZED',
         cloud_threshold: int = 20,
+        bands: Optional[list] = ['B4', 'B3', 'B2', 'B8', 'B11']
     ) -> 'GeoImage':
         region = build_region(lon, lat, buffer_km)
         collection = build_collection(region, start_date, end_date, image_collection, cloud_threshold)
@@ -48,6 +49,7 @@ class GeoImage:
             "date_range": {"start": start_date, "end": end_date},
             "image_collection": image_collection,
             "cloud_threshold": cloud_threshold,
+            "bands": bands,
         }
         
         return cls(ee_image, region, query_data)
@@ -103,3 +105,7 @@ class GeoImage:
             except Exception as e:
                 raise GeoImageError(f"Ошибка при загрузке TIFF-файла: {e}") from e
         return self._tiff_file
+
+    #TODO: Метадата
+    
+    #TODO: GeoJSON
