@@ -21,7 +21,7 @@ def _resolve_credentials_path(configured_path: str | None) -> Path | None:
 
     filename = original_path.name
     candidates = [
-        Path("/app/credentials") / filename,
+        Path("/back/credentials") / filename,
         Path(__file__).resolve().parent / "credentials" / filename,
         Path.cwd() / "credentials" / filename,
         Path.cwd() / "back" / "credentials" / filename,
