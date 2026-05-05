@@ -47,6 +47,11 @@ jobs:
           uv pip install --system -r back/requirements.txt
           uv pip install --system -r front/requirements.txt
 
+      - name: Create .env and credentialsfiles
+        run: |
+          echo "${{ secrets.ENV }}" > .env
+          echo '${{ secrets.CREDENTIALS_JSON }}' > /back/credentials/mseml.json
+
       - name: Start backend
         run: |
           cd back
