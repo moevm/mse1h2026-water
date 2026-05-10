@@ -103,8 +103,6 @@ class GeoImage(AbstactEEObject):
     
     def local_save_src(self, src_img_path = "files/img/source"):
         
-        # Вариант улучшения: Можно сделать запрос ссылки, только если старая неактивна
-        # (в маске также)
         resp = requests.get(self._build_thumbnail(), timeout=5)
         resp.raise_for_status()
 

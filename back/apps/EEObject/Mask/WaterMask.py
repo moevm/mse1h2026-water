@@ -14,8 +14,6 @@ class WaterMask(AbstractGeoMask):
     
     
     def get_mask(self):
-        # Вариант улучшения: Можно сделать запрос ссылки, только если старая неактивна
-        # (в GeoImage также)
         mask_url = self._build_thumbnail()
         
         resp = requests.get(mask_url, timeout=5)

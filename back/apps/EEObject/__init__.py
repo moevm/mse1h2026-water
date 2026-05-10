@@ -30,6 +30,7 @@ class AbstactEEObject(ABC):
     
     
     def _build_thumbnail(self):
+        # Вариант улучшения: Можно сделать запрос ссылки, только если старая неактивна
         self._ee_obj_url = self.ee_object.getThumbURL({
             'region': self.region,
             'scale': self.scale,
