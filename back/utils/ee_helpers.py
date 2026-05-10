@@ -37,7 +37,8 @@ def build_collection(
 def request_image(collection: ee.ImageCollection) -> ee.Image:
     try:
         ee_image = collection.first()
-        if ee_image is None or ee_image.getInfo() is None:
+        if ee_image is None:
             raise NoImageFoundError
+        return ee_image
     except ee.EEException as e:
         raise GeoImageError(f"Ошибка Earth Engine при получении снимка: {e}") from e

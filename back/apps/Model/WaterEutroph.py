@@ -1,4 +1,4 @@
-from Model.ModelInterface import ModelInterface
+from back.apps.Model.AbstractModel import OpenCVimg
 
-class WaterEutroph(ModelInterface):
+class WaterEutroph(OpenCVimg):
     ...
