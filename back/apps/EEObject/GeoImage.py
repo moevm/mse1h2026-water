@@ -1,8 +1,9 @@
 from typing import Optional, Dict, Any
 
-from utils.ee_helpers import build_region, build_collection, request_image
+from apps.EEObject import AbstactEEObject
+from utils.ee_collections import build_collection, request_image
 from utils.ee_auth import initialize_ee
-from exceptions import GeoImageError, NoImageFoundError
+from exceptions import GeoImageError, InvalidParametersError
 
 import os
 import ee
@@ -13,15 +14,51 @@ import requests
 initialize_ee()
 
 
-class GeoImage:
-    def __init__(self, ee_image: ee.Image, region: ee.Geometry, query_data: Dict[str, Any]):
-        self._ee_image = ee_image.select(query_data.get("bands", ('B4', 'B3', 'B2', 'B8', 'B11')))
-        self._region = region
+class GeoImage(AbstactEEObject):
+    def __init__(self, query_data: Dict[str, Any]):
+        super().__init__(query_data)
         self._info: Optional[Dict[str, Any]] = None
-        self._query_data = query_data
         self._tiff_file: Optional[str] = None
-        self._src_img_url: str = None
         self._local_src_file = None
+
+    
+    @property
+    def _max_palette_value(self):
+        return 3000
+    
+    
+    def _set_ee_object(self):
+        region, start_date, end_date, image_collection, cloud_threshold = (
+            self.query_data["region"],
+            self.query_data["start_date"],
+            self.query_data["end_date"],
+            self.query_data["image_collection"],
+            self.query_data["cloud_threshold"],
+        )
+        
+        collection = build_collection(
+            region, start_date, end_date, image_collection, cloud_threshold
+        )
+        
+        ee_image = request_image(collection)
+            
+        return ee_image.select(self.query_data.get("bands"))
+    
+
+    def _set_ee_region(self) -> ee.Geometry:
+        lon, lat, buffer_km = (
+            self.query_data["lon"],
+            self.query_data["lat"],
+            self.query_data["buffer_km"],
+        )
+        
+        try:
+            point = ee.Geometry.Point([lon, lat])
+            return point.buffer(buffer_km * 1000).bounds()
+        except ee.EEException as e:
+            raise InvalidParametersError(
+                f"Не удалось построить регион: lon={lon}, lat={lat}, buffer={buffer_km} км"
+            ) from e
 
 
     @classmethod
@@ -33,17 +70,9 @@ class GeoImage:
         end_date: str = '2025-08-31',
         image_collection: str = 'COPERNICUS/S2_SR_HARMONIZED',
         cloud_threshold: int = 20,
-        bands: Optional[list] = ('B4', 'B3', 'B2', 'B8', 'B11')
+        scale: int = 30,
+        bands: Optional[tuple] = ('B4', 'B3', 'B2', 'B8', 'B11')
     ) -> 'GeoImage':
-        region = build_region(lon, lat, buffer_km)
-        collection = build_collection(region, start_date, end_date, image_collection, cloud_threshold)
-
-        try:
-            ee_image = request_image(collection)
-        except NoImageFoundError:
-            raise NoImageFoundError(
-                f"Не найдено изображений для координат: lon={lon}, lat={lat}, buffer={buffer_km} км, date_range=({start_date}, {end_date})"
-            )
 
         query_data = {
             "coordinates_center": {"longitude": lon, "latitude": lat},
@@ -51,16 +80,17 @@ class GeoImage:
             "date_range": {"start": start_date, "end": end_date},
             "image_collection": image_collection,
             "cloud_threshold": cloud_threshold,
+            "scale": scale,
             "bands": bands,
         }
         
-        return cls(ee_image, region, query_data)
+        return cls(query_data)
 
 
     def _load_info(self) -> Optional[Dict[str, Any]]:
         if self._info is None:
             try:
-                self._info = self._ee_image.getInfo()
+                self._info = self.ee_object.getInfo()
             except ee.EEException as e:
                 raise GeoImageError(f"Ошибка при получении информации об изображении: {e}") from e
         return self._info
@@ -69,23 +99,12 @@ class GeoImage:
     @property
     def info(self) -> Optional[Dict[str, Any]]:
         return self._load_info()
-
-
-    def _build_thumbnail(self, scale: int = 30):
-        self._src_img_url = self._ee_image.getThumbURL({
-            'region': self._region,
-            'scale': scale,
-            'format': 'png',
-            'min': 0,
-            'max': 3000,
-            'crs': 'EPSG:3857'
-        })
-        return self._src_img_url
     
     
-    def local_save_src(self, src_img_path = "files/img/source"): 
+    def local_save_src(self, src_img_path = "files/img/source"):
         
         # Вариант улучшения: Можно сделать запрос ссылки, только если старая неактивна
+        # (в маске также)
         resp = requests.get(self._build_thumbnail(), timeout=5)
         resp.raise_for_status()
 
@@ -101,10 +120,10 @@ class GeoImage:
         return self._local_src_file
 
 
-    def _download_tiff(self, filepath: str = "files/geotif", scale: int = 30) -> str:
-        ee_tif_url = self._ee_image.getDownloadURL({
-            "region": self._region,
-            "scale": scale,
+    def _download_tiff(self, filepath: str = "files/geotif") -> str:
+        ee_tif_url = self.ee_object.getDownloadURL({
+            "region": self.region,
+            "scale": self.scale,
             "format": "GEO_TIFF",
             "crs": "EPSG:3857",
         })
@@ -118,10 +137,10 @@ class GeoImage:
 
 
     @property
-    def tiff_file(self, scale: int = 30) -> str:
+    def tiff_file(self) -> str:
         if self._tiff_file is None:
             try:
-                self._tiff_file = self._download_tiff(scale)
+                self._tiff_file = self._download_tiff(self.scale)
             except Exception as e:
                 raise GeoImageError(f"Ошибка при загрузке TIFF-файла: {e}") from e
         return self._tiff_file

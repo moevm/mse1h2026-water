@@ -3,16 +3,6 @@ from exceptions import GeoImageError, InvalidParametersError, NoImageFoundError
 import ee
 
 
-def build_region(lon: float, lat: float, buffer_km: float) -> ee.Geometry:
-    try:
-        point = ee.Geometry.Point([lon, lat])
-        return point.buffer(buffer_km * 1000).bounds()
-    except ee.EEException as e:
-        raise InvalidParametersError(
-            f"Не удалось построить регион: lon={lon}, lat={lat}, buffer={buffer_km} км"
-        ) from e
-
-
 def build_collection(
     region: ee.Geometry, 
     start_date: str, 

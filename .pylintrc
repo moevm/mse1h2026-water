@@ -1,5 +1,5 @@
 [FORMAT]
-max-line-length = 140
+max-line-length = 100
 
 [MESSAGES CONTROL]
 disable = missing-function-docstring, no-member, trailing-whitespace
