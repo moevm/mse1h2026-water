@@ -123,3 +123,52 @@ def interpret_eutrophication(
         "ndci_mean": ndci_mean,
         "polluted_percentage": polluted_percentage,
     }
+
+def dominant_water_type(geojson_features: List[Dict[str, Any]]) -> Optional[str]:
+    if not geojson_features:
+        return None
+    areas: Dict[str, float] = {}
+    for f in geojson_features:
+        props = f.get("properties", {})
+        wtype = str(props.get("type", "")).lower()
+        if not wtype:
+            continue
+        areas[wtype] = areas.get(wtype, 0.0) + float(props.get("area_pixels", 0) or 0)
+    if not areas:
+        return None
+    return max(areas, key=areas.get)
+
+def per_type_breakdown(
+    geojson_features: List[Dict[str, Any]],
+    ndci_mean: Optional[float],
+    polluted_percentage: Optional[float],
+) -> Dict[str, Dict[str, Any]]:
+    types_present = {
+        str(f.get("properties", {}).get("type", "")).lower()
+        for f in geojson_features
+    }
+    types_present.discard("")
+    return {
+        t: interpret_eutrophication(ndci_mean, polluted_percentage, t)
+        for t in sorted(types_present)
+    }
+
+def build_risk_interpretation(
+    eutrophication_stats: Optional[Dict[str, Any]],
+    geojson_features: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    if not eutrophication_stats:
+        return None
+
+    ndci_mean = eutrophication_stats.get("ndci_mean")
+    polluted_pct = eutrophication_stats.get("polluted_percentage")
+
+    dominant = dominant_water_type(geojson_features)
+    primary = interpret_eutrophication(ndci_mean, polluted_pct, dominant) if dominant else None
+    by_type = per_type_breakdown(geojson_features, ndci_mean, polluted_pct)
+
+    return {
+        "dominant_type": dominant,
+        "primary": primary,
+        "by_type": by_type,
+    }
