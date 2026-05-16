@@ -67,3 +67,11 @@ _POLLUTED_RULES: Dict[str, List[tuple]] = {
         (None, "очень обширная зона повышенной органики"),
     ],
 }
+
+def _lookup(value: Optional[float], rules: List[tuple]) -> tuple:
+    if value is None:
+        return rules[-1]
+    for upper, *rest in rules:
+        if upper is None or value < upper:
+            return (upper, *rest)
+    return rules[-1]
