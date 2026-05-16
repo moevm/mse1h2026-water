@@ -75,3 +75,51 @@ def _lookup(value: Optional[float], rules: List[tuple]) -> tuple:
         if upper is None or value < upper:
             return (upper, *rest)
     return rules[-1]
+
+def interpret_eutrophication(
+    ndci_mean: Optional[float],
+    polluted_percentage: Optional[float],
+    water_type: str,
+) -> Dict[str, Any]:
+    water_type = (water_type or "").lower()
+    rules = _NDCI_RULES.get(water_type)
+
+    if rules is None:
+        return {
+            "water_type": water_type or "неизвестно",
+            "level": LEVEL_NOTICE,
+            "level_label": LEVEL_LABELS[LEVEL_NOTICE],
+            "color": LEVEL_COLORS[LEVEL_NOTICE],
+            "summary": "Тип водоема неизвестен - интерпретация ориентировочная.",
+            "ndci_mean": ndci_mean,
+            "polluted_percentage": polluted_percentage,
+        }
+
+    if ndci_mean is None:
+        return {
+            "water_type": water_type,
+            "level": LEVEL_OK,
+            "level_label": "нет данных",
+            "color": "#9e9e9e",
+            "summary": "Недостаточно данных для оценки.",
+            "ndci_mean": None,
+            "polluted_percentage": polluted_percentage,
+        }
+
+    _, level, description = _lookup(ndci_mean, rules)
+    pct_note = ""
+    if polluted_percentage is not None:
+        pct_rules = _POLLUTED_RULES.get(water_type, [])
+        if pct_rules:
+            _, note = _lookup(polluted_percentage, pct_rules)
+            pct_note = f"Площадь с превышением порога - {polluted_percentage:.1f}% ({note})."
+
+    return {
+        "water_type": water_type,
+        "level": level,
+        "level_label": LEVEL_LABELS[level],
+        "color": LEVEL_COLORS[level],
+        "summary": description + pct_note,
+        "ndci_mean": ndci_mean,
+        "polluted_percentage": polluted_percentage,
+    }
