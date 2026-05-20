@@ -1,5 +1,5 @@
 from routers import methods
-from model import integrated_water_classifiers, calculate_ndci
+from model import integrated_water_classifiers, calculate_ndci, risk_interpreter
 
 from fastapi import FastAPI, APIRouter, Query, Request
 from fastapi.responses import RedirectResponse
@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import uvicorn
 import os
+import json
 
 file = os.path.basename(__file__)
 filename = os.path.splitext(file)[0]
@@ -43,11 +44,35 @@ async def get_water_info(
     image, region, url, metadata = methods.download_images.get_satellite_image(
         lon, lat, buffer_km, start_date, end_date
     )
+
+    eutrophication_stats = calculate_ndci.get_eutrophication_stats(
+        lon, lat, buffer_km, start_date, end_date
+    )
     
     result = await integrated_water_classifiers.cv_integrated_water_classifier(image, region, url, metadata)
+
+    ndci_mean = eutrophication_stats.get("ndci_mean") if eutrophication_stats else None
+    polluted_pct = eutrophication_stats.get("polluted_percentage") if eutrophication_stats else None
+
+    geojson_data = result.pop("geojson_data", None)
+    features = geojson_data.get("features", []) if geojson_data else []
+
+    for feature in features:
+        wtype = feature["properties"].get("type", "")
+        feature["properties"]["risk"] = risk_interpreter.interpret_eutrophication(
+            ndci_mean, polluted_pct, wtype
+        )
+    
+    if geojson_data and result.get("geojson_path"):
+        with open(result["geojson_path"], "w", encoding="utf-8") as f:
+            json.dump(geojson_data, f, indent=2, ensure_ascii=False)
+    
     result["image_path"] = f"{request.base_url}{result['image_path']}"
     result["geojson_path"] = f"{request.base_url}{result['geojson_path']}"
     result["eutrophication_stats"] = calculate_ndci.get_eutrophication_stats(lon, lat, buffer_km, start_date, end_date)
+    result["risk_interpretation"] = risk_interpreter.build_risk_interpretation(
+        eutrophication_stats, features
+    )
     return result
 
 

@@ -87,7 +87,8 @@ def reset_coords() -> None:
     st.session_state["map_style_label"] = "Спутник"
     st.session_state["api_error"] = ""
     st.session_state["geojson_data"] = None
-    st.session_state["geojson_coords"] = None 
+    st.session_state["geojson_coords"] = None
+    st.session_state["risk_interpretation"] = None 
 
 def update_map_from_input() -> None:
     """Обновляет карту при изменении координат в полях ввода"""
@@ -188,13 +189,69 @@ def run_analysis(coords: Coords) -> str:
         # Сохраняем geojson в session state для отображения на основной карте
         st.session_state["geojson_data"] = geojson
         st.session_state["geojson_coords"] = coords
+        st.session_state["risk_interpretation"] = api_response.get("risk_interpretation")
         
         return format_result_from_backend(api_response, coords)
     else:
         return (
             f"Данные с сервера не получены\n\n" 
         )
+    
+def render_risk_interpretation(risk: Optional[Dict[str, Any]]) -> None:
+    if not risk:
+        return
 
+    primary = risk.get("primary")
+    dominant = risk.get("dominant_type")
+    by_type = risk.get("by_type") or {}
+
+    st.subheader("Риск эвтрофикации")
+
+    if primary:
+        color = primary.get("color", "#9e9e9e")
+        level_label = primary.get("level_label", "")
+        description = primary.get("description", primary.get("summary", ""))
+        pct_note = primary.get("pct_note") or ""
+        ndci = primary.get("ndci_mean")
+        ndci_text = f"NDCI = {ndci:.3f}" if isinstance(ndci, (int, float)) else "NDCI: нет данных"
+        pct_html = f"<br><span style='color:#666;'>{pct_note}</span>" if pct_note else ""
+
+        st.markdown(
+            f"""
+            <div style="
+                border-left: 6px solid {color};
+                background: {color}15;
+                padding: 12px 16px;
+                border-radius: 6px;
+                margin-bottom: 12px;
+            ">
+                <div style="font-size: 14px; color: #555;">
+                    Доминирующий тип: <b>{dominant or 'неизвестно'}</b> · {ndci_text}
+                </div>
+                <div style="font-size: 18px; font-weight: 600; color: {color}; margin: 4px 0;">
+                    {level_label.upper()}
+                </div>
+                <div style="font-size: 14px;">{description}{pct_html}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if len(by_type) > 1:
+        with st.expander("Сводка по другим типам водоёмов в радиусе"):
+            for wtype, item in by_type.items():
+                if wtype == dominant:
+                    continue
+                desc = item.get("description", item.get("summary", ""))
+                pct = item.get("pct_note") or ""
+                pct_html = f"<br><span style='color:#888; font-size:13px;'>{pct}</span>" if pct else ""
+                st.markdown(
+                    f"<div style='border-left: 4px solid {item.get('color', '#9e9e9e')};"
+                    f" padding: 6px 12px; margin: 6px 0;'>"
+                    f"<b>{wtype}</b> — {item.get('level_label', '')}: "
+                    f"{desc}{pct_html}</div>",
+                    unsafe_allow_html=True,
+                )
 
 def get_color_by_type(feature_type: str) -> str:
     """Возвращает цвет в зависимости от типа"""
@@ -250,6 +307,9 @@ def build_map_figure(lat, lon, zoom, map_style, geojson=None, polygon_alpha: flo
                         f["properties"].get("elongation"),
                         f["properties"].get("lon"),
                         f["properties"].get("lat"),
+                        feature_type,
+                        (f["properties"].get("risk") or {}).get("level_label", "—"),
+                        (f["properties"].get("risk") or {}).get("summary", "нет интерпретации"),
                     ]
                     for f in type_features
                 ],
@@ -318,6 +378,8 @@ if "geojson_data" not in st.session_state:
     st.session_state["geojson_data"] = None
 if "geojson_coords" not in st.session_state:
     st.session_state["geojson_coords"] = None
+if "risk_interpretation" not in st.session_state:
+    st.session_state["risk_interpretation"] = None
 
 
 st.title("🧭 Анализ по координатам")
@@ -377,6 +439,7 @@ if st.session_state.get("api_error"):
 
 if st.session_state["result_text"]:
     st.success("Анализ выполнен!")
+    render_risk_interpretation(st.session_state.get("risk_interpretation"))
 
 st.markdown("---")
 st.subheader("🗺️ Карта")
