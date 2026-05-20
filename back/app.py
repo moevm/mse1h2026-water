@@ -69,7 +69,7 @@ async def get_water_info(
     
     result["image_path"] = f"{request.base_url}{result['image_path']}"
     result["geojson_path"] = f"{request.base_url}{result['geojson_path']}"
-    result["eutrophication_stats"] = calculate_ndci.get_eutrophication_stats(lon, lat, buffer_km, start_date, end_date)
+    result["eutrophication_stats"] = eutrophication_stats
     result["risk_interpretation"] = risk_interpreter.build_risk_interpretation(
         eutrophication_stats, features
     )
