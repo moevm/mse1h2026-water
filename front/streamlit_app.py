@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
+from datetime import date
 from typing import Optional, Dict, Any
-import requests 
+import requests
 import plotly.graph_objects as go
 import streamlit as st
 import json
@@ -88,7 +89,10 @@ def reset_coords() -> None:
     st.session_state["api_error"] = ""
     st.session_state["geojson_data"] = None
     st.session_state["geojson_coords"] = None
-    st.session_state["risk_interpretation"] = None 
+    st.session_state["risk_interpretation"] = None
+    st.session_state["start_date"] = date(2025, 6, 1)
+    st.session_state["end_date"] = date(2025, 8, 31)
+    st.session_state["cloud_percentage"] = None
 
 def update_map_from_input() -> None:
     """Обновляет карту при изменении координат в полях ввода"""
@@ -129,7 +133,9 @@ def try_precheck_running() -> None:
 
     st.session_state["map_lat"] = lat_val
     st.session_state["map_lon"] = lon_val
-    result = run_analysis(Coords(lat=lat_val, lon=lon_val))
+    start = st.session_state["start_date"].strftime("%Y-%m-%d")
+    end = st.session_state["end_date"].strftime("%Y-%m-%d")
+    result = run_analysis(Coords(lat=lat_val, lon=lon_val), start, end)
     
     if result:
         st.session_state["result_text"] = result
@@ -138,15 +144,17 @@ def try_precheck_running() -> None:
         st.session_state["result_text"] = ""
         st.session_state["api_error"] = "Не удалось получить данные с сервера"
 
-def get_water_info_from_backend(coords: Coords) -> Optional[Dict[str, Any]]:
+def get_water_info_from_backend(coords: Coords, start_date: str, end_date: str) -> Optional[Dict[str, Any]]:
     try:
         response = requests.get(
             WATER_INFO_ENDPOINT,
             params={
                 "lat": coords.lat,
-                "lon": coords.lon
+                "lon": coords.lon,
+                "start_date": start_date,
+                "end_date": end_date,
             },
-            timeout=90  
+            timeout=90
         )
         response.raise_for_status()
         return response.json()
@@ -178,19 +186,24 @@ def format_result_from_backend(api_response: Dict[str, Any], coords: Coords) -> 
     )
 
 
-def run_analysis(coords: Coords) -> str:
+def run_analysis(coords: Coords, start_date: str, end_date: str) -> str:
     with st.spinner("Получение данных с сервера..."):
-        api_response = get_water_info_from_backend(coords)
+        api_response = get_water_info_from_backend(coords, start_date, end_date)
     if api_response:
         geojson_data = api_response.get("geojson_path")
         geojson_response = requests.get(geojson_data)
         geojson = geojson_response.json() if geojson_response.status_code == 200 else None
-        
-        # Сохраняем geojson в session state для отображения на основной карте
+
         st.session_state["geojson_data"] = geojson
         st.session_state["geojson_coords"] = coords
         st.session_state["risk_interpretation"] = api_response.get("risk_interpretation")
-        
+
+        if geojson:
+            meta = geojson.get("metadata", {})
+            st.session_state["cloud_percentage"] = meta.get("cloud_percentage")
+        else:
+            st.session_state["cloud_percentage"] = None
+
         return format_result_from_backend(api_response, coords)
     else:
         return (
@@ -380,10 +393,64 @@ if "geojson_coords" not in st.session_state:
     st.session_state["geojson_coords"] = None
 if "risk_interpretation" not in st.session_state:
     st.session_state["risk_interpretation"] = None
+if "start_date" not in st.session_state:
+    st.session_state["start_date"] = date(2025, 6, 1)
+if "end_date" not in st.session_state:
+    st.session_state["end_date"] = date(2025, 8, 31)
+if "cloud_percentage" not in st.session_state:
+    st.session_state["cloud_percentage"] = None
 
 
 st.title("🧭 Анализ по координатам")
 st.write("Введите широту и долготу вручную. Карта ниже обновится по выбранной точке.")
+
+with st.expander("ℹ️ О сервисе и ограничениях", expanded=False):
+    st.markdown("##### Цветовая схема водоёмов на карте")
+    st.markdown(
+        """
+        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:7px;">
+                <div style="width:18px;height:18px;background:#ffff00;border:1px solid #aaa;border-radius:3px;"></div>
+                <span>Пруд</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:7px;">
+                <div style="width:18px;height:18px;background:#00cc00;border:1px solid #aaa;border-radius:3px;"></div>
+                <span>Река</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:7px;">
+                <div style="width:18px;height:18px;background:#ff0000;border:1px solid #aaa;border-radius:3px;"></div>
+                <span>Болото</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:7px;">
+                <div style="width:18px;height:18px;background:#0000ff;border:1px solid #aaa;border-radius:3px;"></div>
+                <span>Озеро</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("##### Источник данных")
+    st.markdown(
+        "Все снимки получены со спутника **Sentinel-2** (коллекция `COPERNICUS/S2_SR_HARMONIZED`, "
+        "разрешение 30 м/пиксель)."
+    )
+
+    st.markdown("##### Облачность")
+    st.markdown(
+        "Для анализа автоматически выбирается снимок с **облачностью менее 20%** "
+        "за указанный период. Фактический процент облачности выбранного снимка "
+        "отображается после выполнения анализа."
+    )
+
+    st.markdown("##### Ограничения")
+    st.markdown(
+        "- **Радиус анализа**: зона охвата ограничена **6 км** от указанной точки.\n"
+        "- **Болота**: классификация болот основана на геометрических признаках "
+        "контуров и не адаптирована для точного определения — результаты могут быть неточными.\n"
+        "- **Период**: для корректного анализа рекомендуется выбирать летний сезон "
+        "(июнь–август), когда водоёмы хорошо выделяются на снимках."
+    )
 
 @st.cache_data(ttl=60) 
 def check_backend_health():
@@ -419,6 +486,24 @@ with col2:
     if st.session_state["lon_error"]:
         st.error(st.session_state["lon_error"])
 
+d1, d2 = st.columns(2)
+
+with d1:
+    st.date_input(
+        "Начало периода",
+        key="start_date",
+        min_value=date(2015, 6, 23),
+        max_value=date.today(),
+    )
+
+with d2:
+    st.date_input(
+        "Конец периода",
+        key="end_date",
+        min_value=date(2015, 6, 23),
+        max_value=date.today(),
+    )
+
 b1, b2 = st.columns([1, 1])
 
 with b1:
@@ -439,6 +524,19 @@ if st.session_state.get("api_error"):
 
 if st.session_state["result_text"]:
     st.success("Анализ выполнен!")
+
+    cloud_pct = st.session_state.get("cloud_percentage")
+    if cloud_pct is not None:
+        if cloud_pct < 5:
+            cloud_label = f"☀️ Облачность снимка: **{cloud_pct:.1f}%** — практически без облаков"
+        elif cloud_pct < 15:
+            cloud_label = f"⛅ Облачность снимка: **{cloud_pct:.1f}%** — незначительная облачность"
+        else:
+            cloud_label = f"☁️ Облачность снимка: **{cloud_pct:.1f}%** — умеренная облачность"
+        st.info(cloud_label)
+    else:
+        st.info("☁️ Данные об облачности снимка недоступны")
+
     render_risk_interpretation(st.session_state.get("risk_interpretation"))
 
 st.markdown("---")
