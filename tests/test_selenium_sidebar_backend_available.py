@@ -21,6 +21,7 @@ def test_sidebar_backend_available():
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1400,1000")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     try:

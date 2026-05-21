@@ -323,7 +323,6 @@ if "geojson_coords" not in st.session_state:
 st.title("🧭 Анализ по координатам")
 st.write("Введите широту и долготу вручную. Карта ниже обновится по выбранной точке.")
 
-@st.cache_data(ttl=60) 
 def check_backend_health():
     try:
         response = requests.get(f"{BACKEND_URL}/", timeout=2)
