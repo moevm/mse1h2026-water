@@ -224,6 +224,7 @@ async def cv_integrated_water_classifier(image_data, region, image_source, metad
             json.dump(geojson, f, indent=2, ensure_ascii=False)
 
         answer["geojson_path"] = filename
+        answer["geojson_data"] = geojson
 
     if do_show_content:
         answer["results"] = results

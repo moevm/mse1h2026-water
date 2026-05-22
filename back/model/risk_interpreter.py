@@ -90,6 +90,8 @@ def interpret_eutrophication(
             "level": LEVEL_NOTICE,
             "level_label": LEVEL_LABELS[LEVEL_NOTICE],
             "color": LEVEL_COLORS[LEVEL_NOTICE],
+            "pct_note": None,
+            "description": "Тип водоёма неизвестен — интерпретация ориентировочная.",
             "summary": "Тип водоема неизвестен - интерпретация ориентировочная.",
             "ndci_mean": ndci_mean,
             "polluted_percentage": polluted_percentage,
@@ -101,13 +103,15 @@ def interpret_eutrophication(
             "level": LEVEL_OK,
             "level_label": "нет данных",
             "color": "#9e9e9e",
+            "pct_note": None,
+            "description": "Недостаточно данных для оценки.",
             "summary": "Недостаточно данных для оценки.",
             "ndci_mean": None,
             "polluted_percentage": polluted_percentage,
         }
 
     _, level, description = _lookup(ndci_mean, rules)
-    pct_note = ""
+    pct_note = None
     if polluted_percentage is not None:
         pct_rules = _POLLUTED_RULES.get(water_type, [])
         if pct_rules:
@@ -119,7 +123,9 @@ def interpret_eutrophication(
         "level": level,
         "level_label": LEVEL_LABELS[level],
         "color": LEVEL_COLORS[level],
-        "summary": description + pct_note,
+        "description": description,
+        "pct_note": pct_note,
+        "summary": description + (f" {pct_note}" if pct_note else ""),
         "ndci_mean": ndci_mean,
         "polluted_percentage": polluted_percentage,
     }
