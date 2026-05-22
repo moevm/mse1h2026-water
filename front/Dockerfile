@@ -28,4 +28,4 @@ COPY front/ ./
 EXPOSE 8501
 
 # Запуск Streamlit
-CMD ["python", "-X", "utf8", "-m", "streamlit", "run", "front/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["python", "-X", "utf8", "-m", "streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
