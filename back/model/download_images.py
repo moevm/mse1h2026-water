@@ -31,6 +31,7 @@ def build_collection(
 
     region_area = region.area(maxError=1)
 
+
     def add_coverage(image):
         intersection = image.geometry().intersection(
             region,
@@ -42,6 +43,7 @@ def build_collection(
         coverage = coverage_area.divide(region_area)
 
         return image.set("coverage", coverage)
+
 
     return (
         ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
