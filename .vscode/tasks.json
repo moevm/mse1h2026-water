@@ -1,0 +1,65 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend: Python app.py",
+      "type": "shell",
+      "command": "python app.py",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/back"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "all",
+        "focus": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: Streamlit",
+      "type": "shell",
+      "command": "streamlit run streamlit_app.py",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/front"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "all",
+        "focus": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Tests: Pytest",
+      "type": "shell",
+      "command": "pytest --deselect tests/test_selenium.py::test_streamlit_coordinates",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "all",
+        "focus": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Запуск Backend + Frontend + Tests (Ctrl+Shift+B)",
+      "dependsOn": [
+        "Backend: Python app.py",
+        "Frontend: Streamlit",
+        "Tests: Pytest"
+      ],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

@@ -6,8 +6,6 @@ import uuid
 from datetime import datetime
 from typing import Tuple, Optional, Dict, Any
 
-from streamlit import image
-
 try:
     from ee_auth import initialize_ee
 except ModuleNotFoundError:

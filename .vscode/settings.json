@@ -1,0 +1,41 @@
+{
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "python.testing.pytestArgs": [
+    "."
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+
+  // Extension: vscode-commands
+  "commands.commands": [
+      {
+          "text": "▶️ Full Stack",
+          "command": "workbench.action.tasks.runTask",
+          "arguments": [
+              "Запуск Backend + Frontend + Tests (Ctrl+Shift+B)"
+          ]
+      },
+      {
+          "text": "⚙️ Backend",
+          "command": "workbench.action.tasks.runTask",
+          "arguments": [
+              "Backend: Python app.py"
+          ]
+      },
+      {
+          "text": "✨ Frontend",
+          "command": "workbench.action.tasks.runTask",
+          "arguments": [
+              "Frontend: Streamlit"
+          ]
+      },
+      {
+          "text": "🧪 Tests",
+          "command": "workbench.action.tasks.runTask",
+          "arguments": [
+              "Tests: Pytest"
+          ]
+      }
+  ]
+}

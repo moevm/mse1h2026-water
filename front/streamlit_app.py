@@ -325,11 +325,16 @@ st.write("Введите широту и долготу вручную. Карт
 
 @st.cache_data(ttl=60) 
 def check_backend_health():
-    try:
-        response = requests.get(f"{BACKEND_URL}/", timeout=2)
-        return response.status_code == 200
-    except:
-        return False
+    for i in range(3):
+        try:
+            response = requests.get(f"{BACKEND_URL}/", timeout=2)
+            response.raise_for_status()
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            if i == 2: 
+                return False
+            continue
+    
 if check_backend_health():
     st.sidebar.success("Бэкенд подключен")
 else:
