@@ -404,6 +404,7 @@ if "cloud_percentage" not in st.session_state:
 st.title("🧭 Анализ по координатам")
 st.write("Введите широту и долготу вручную. Карта ниже обновится по выбранной точке.")
 
+
 with st.expander("ℹ️ О сервисе и ограничениях", expanded=False):
     st.markdown("##### Цветовая схема водоёмов на карте")
     st.markdown(
@@ -452,13 +453,18 @@ with st.expander("ℹ️ О сервисе и ограничениях", expande
         "(июнь–август), когда водоёмы хорошо выделяются на снимках."
     )
 
-@st.cache_data(ttl=60) 
+
 def check_backend_health():
-    try:
-        response = requests.get(f"{BACKEND_URL}/", timeout=2)
-        return response.status_code == 200
-    except:
-        return False
+    for i in range(3):
+        try:
+            response = requests.get(f"{BACKEND_URL}/", timeout=2)
+            response.raise_for_status()
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            if i == 2: 
+                return False
+            continue
+    
 if check_backend_health():
     st.sidebar.success("Бэкенд подключен")
 else:

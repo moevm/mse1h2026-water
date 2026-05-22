@@ -5,7 +5,7 @@ from fastapi import FastAPI, APIRouter, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware 
-
+from fastapi import HTTPException
 import uvicorn
 import os
 import json
@@ -39,6 +39,12 @@ async def get_water_info(
     end_date: str = Query(default='2025-08-31'),
 ):
     
+    if buffer_km > 6:
+        raise HTTPException(
+            status_code=413,
+            detail="Слишком большой радиус запроса"
+        )
+
     methods.initialize_ee()
     
     image, region, url, metadata = methods.download_images.get_satellite_image(

@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Backend",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/back/app.py",
+      "cwd": "${workspaceFolder}/back",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+    },
+    {
+      "name": "Streamlit: Frontend",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "streamlit_app.py"
+      ],
+      "cwd": "${workspaceFolder}/front",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+    },
+    {
+      "name": "Pytest: Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "--deselect",
+        "tests/test_selenium.py::test_streamlit_coordinates"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+    },
+  ],
+  "compounds": [
+    {
+      "name": "Запуск дебага Backend + Frontend + Tests [Ctrl (опционально; без дебага) + F5]",
+      "configurations": [
+        "Python: Backend",
+        "Streamlit: Frontend",
+        "Pytest: Tests"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "run",
+        "order": 1
+      },
+      "stopAll": true
+    }
+  ]
+}

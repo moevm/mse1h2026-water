@@ -1,8 +1,6 @@
 from pyproj import Transformer
-from model.download_images import get_satellite_image
 from model.water_utils import get_water_mask_gee
 
-import asyncio
 import numpy as np
 import cv2
 import requests
@@ -15,7 +13,7 @@ import rasterio
 def load_image(image_source=None, image_data=None, region=None):
     if image_source:
         if image_source.startswith("http"):
-            resp = requests.get(image_source)
+            resp = requests.get(image_source, timeout=5)
             arr = np.frombuffer(resp.content, np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         else:
