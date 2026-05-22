@@ -20,12 +20,36 @@ def build_region(lon: float, lat: float, buffer_km: float) -> ee.Geometry:
     point = ee.Geometry.Point([lon, lat])
     return point.buffer(buffer_km * 1000).bounds()
 
-def build_collection(region: ee.Geometry, start_date: str, end_date: str):
+def build_collection(
+    region: ee.Geometry,
+    start_date: str,
+    end_date: str,
+    min_coverage: float = 0.9,
+):
+
+    region_area = region.area(maxError=1)
+
+
+    def add_coverage(image):
+        intersection = image.geometry().intersection(
+            region,
+            ee.ErrorMargin(1)
+        )
+
+        coverage_area = intersection.area(maxError=1)
+
+        coverage = coverage_area.divide(region_area)
+
+        return image.set("coverage", coverage)
+
+
     return (
         ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
         .filterDate(start_date, end_date)
         .filterBounds(region)
         .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+        .map(add_coverage)
+        .filter(ee.Filter.gte("coverage", min_coverage))
     )
 
 def select_image(collection):
